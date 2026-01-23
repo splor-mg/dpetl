@@ -1,5 +1,5 @@
-from etl import main
+from etl import cli
 
 
 def test_hello():
-    assert main.hello() == 'Hello, world!'
+    assert cli.hello() == 'Hello, world!'

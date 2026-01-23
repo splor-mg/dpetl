@@ -29,6 +29,12 @@ dev = [
     'ruff (>=0.14.10,<0.15.0)'
 ]
 
+[project.scripts]
+etl = "etl.cli:main"
+
+[tool.poetry]
+packages = [{ include = "etl" }]
+
 [tool.ruff]
 line-length = 79
 
