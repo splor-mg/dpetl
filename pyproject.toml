@@ -14,7 +14,7 @@ dependencies = [
 
 
 [tool.repo-template]
-upstream = 'https://github.com/ziguraty/repo-template-python.git'
+upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
 
 [build-system]
