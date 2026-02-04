@@ -1,4 +1,5 @@
-from .extract_gmail import gmail
+from .email_cli import email
+
 
 def create_extract_subcommands(subparsers):
 
@@ -10,6 +11,6 @@ def create_extract_subcommands(subparsers):
         required=True,
     )
 
-    gmail(subparsers)
+    email(subparsers)
 
     return subparsers
