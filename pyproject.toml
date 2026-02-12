@@ -9,12 +9,13 @@ readme = 'README.md'
 requires-python = '>=3.13,<4.0'
 dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
-    "python-dotenv (>=1.2.1,<2.0.0)"
+    "python-dotenv (>=1.2.1,<2.0.0)",
+    "imap-tools (>=1.11.1,<2.0.0)"
 ]
 
 
 [tool.repo-template]
-upstream = 'https://github.com/ziguraty/repo-template-python.git'
+upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
 
 [build-system]
