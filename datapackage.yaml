@@ -1,0 +1,8 @@
+name: dados-sisor-2026
+title: Sistema Orçamentário - SISOR 2026
+owner_org: secretaria-de-estado-de-planejamento-e-gestao-seplag
+resources:
+  - name: base_orcam_despesa_item_fiscal
+    title: Orçamento da Despesa Fiscal / Itens de Despesa
+    path: data-raw/base_orcam_despesa_item_fiscal.html
+    extract_mode: email

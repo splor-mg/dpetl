@@ -1,15 +1,16 @@
 from frictionless import Package
+from .extract import email_cli
 
 
-def resources_iteration(descriptor=None, package=None, function=None):
+def resources_iteration(**kwargs):
     """
     Iterate on resources from a package descriptor or a package object and apply a function to each resource.
     """
+    descriptor = kwargs.get('descriptor')
     if descriptor:
         package = Package(descriptor)
 
-    if not package:
-        raise ValueError('Either descriptor or package must be provided.')
-
+    # TODO: As the package instaciation is here, read what extraction_mode is in the descriptor and decide which function to apply, instead of receiving it as an argument. Would it be useful?
     for resource in package.resources:
-        function(resource)
+        if resource.custom['extract_info']['mode'] == 'email':
+            email_cli.extract_email(resource, **kwargs)

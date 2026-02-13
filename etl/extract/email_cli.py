@@ -1,85 +1,52 @@
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 from datetime import date
 from imap_tools import MailBox, AND
 from frictionless import Package
-from etl.helpers import resources_iteration
 
+def extract_email(resource, **kwargs):
 
-def email(subparsers):
-    new_cmd = subparsers.add_parser('email',
-        aliases=['g',],
-        help='Extract resources from e-mail.'
-    )
-    # new_cmd.add_argument(
-    #     'name',
-    #     help='Name of the new orphan branch to create.',
-    # )
-    # new_cmd.add_argument(
-    #     '--readme',
-    #     '-r',
-    #     action='store_true',
-    #     help='Add a README.md file to the new orphan branch created.',
-    # )
-    new_cmd.set_defaults(func=handle_command)
-
-def handle_command(args):
-
-    resources_iteration(function=extract_email)
-
-
-# TODO: pasta destino = data_raw como padrão, mas poderá ser modificada.
-# Loop para recursos listados no datapackage.json
-# Não preciso desta função git_push_geral()
-
-def extract_email(resource):
-
-    # TODO: Pass variable to not create folder and exit if it not exists
-    # would it be useful?
     resource_path = Path(resource.path)
     resource_path.parent.mkdir(parents=True, exist_ok=True)
+    subject = resource.custom.get('subject', resource.name)
 
-    # TODO: Pass variable to set different subject if needed
-    # Set up email subject to search
-    today = date.today()
-    formatted_today = today.strftime('%Y-%m-%d')
-    subject = f'{resource.name}-{formatted_today}'
-
-    load_dotenv()
-    user = os.getenv('EMAIL_USER')
-    password = os.getenv('EMAIL_PWD')
-    # breakpoint()
+    load_dotenv(find_dotenv(usecwd=True))
+    email_user = os.environ.get('EMAIL_USER')
+    email_pwd = os.environ.get('EMAIL_PWD')
+    email_smtp = os.environ.get('EMAIL_SMTP')
+    email_box =  os.environ.get('EMAIL_BOX')
+    breakpoint()
 
     try:
         # TODO: Passar parâmetro para aceitar qualquer e-mail (não só Gmail)
         # Buscar email e senha usando dotenv
-        with MailBox('imap.gmail.com').login(user, password) as mailbox:
+        with MailBox(email_smtp).login(email_user, email_pwd) as mailbox:
 
-            # Switch to Trash folder
-            mailbox.folder.set('[Gmail]/Trash')
+            mailbox.folder.set(email_box)
 
-            # CRITÉRIO: Assunto específico E Data de hoje
-            # Não vi ele filtrando a pasta de dentro do e-mail, tipo IMBOX ou Trash
-            criterios = AND(subject=subject, date=today)
+            # CRITÉRIO: Assunto específico
+            # TODO: Receive arguments as **kwargs to allow more flexible criteria, e.g., date, sender, etc.
+            criterios = AND(subject=subject)
 
-            # Pega apenas 1 email (o mais recente de hoje, se houver duplicidade)
+            # get only 1 email (the most recent one with the subject, if there are duplicates)
             msgs = list(mailbox.fetch(criterios, limit=1, reverse=True))
 
             if not msgs:
-                print(f"❌ Erro: consulta não encontrada para asusnto:'{subject}'.")
+                # TODO: Receive arguments as **kwargs to allow more flexible criteria in this message
+                print(f"❌ Error: nothing found for the subject:'{subject}'.")
 
             for msg in msgs:
-                print(f"📧 E-mail localizado: '{msg.subject}'")
+                print(f"📧 E-mail found: '{msg.subject}'")
 
                 for att in msg.attachments:
 
                     with open(resource_path, 'wb') as f:
                         f.write(att.payload)
 
-                    print(f"   ✅ Arquivo salvo em: {resource.path}")
+                    print(f"   ✅ File saved in: {resource.path}")
 
 
     except Exception as e:
-        print(f"❌ Erro crítico de conexão: {e}")
+        print(f"❌ Error in the connection: {e}")
         return
