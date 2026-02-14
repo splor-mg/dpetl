@@ -1,6 +1,6 @@
 from frictionless import Package
 from .extract import email
-
+from .extract import api
 
 def resources_iteration(**kwargs):
     """
@@ -10,7 +10,8 @@ def resources_iteration(**kwargs):
     if descriptor:
         package = Package(descriptor)
 
-    # TODO: As the package instaciation is here, read what extraction_mode is in the descriptor and decide which function to apply, instead of receiving it as an argument. Would it be useful?
     for resource in package.resources:
         if resource.custom['extract_info']['mode'] == 'email':
             email.extract_email(resource, **kwargs)
+        elif resource.custom['extract_info']['mode'] == 'api':
+            api.extract_api(resource, **kwargs)
