@@ -1,4 +1,4 @@
-from etl.helpers import resources_iteration
+from dpetl.helpers import resources_iteration
 
 def create_extract_subcommands(subparsers):
 

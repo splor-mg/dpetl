@@ -1,4 +1,4 @@
-from etl import cli
+from dpetl import cli
 
 
 def test_hello():
