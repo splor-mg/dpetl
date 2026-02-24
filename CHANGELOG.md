@@ -1,3 +1,9 @@
+## 0.3.1 (2026-02-24)
+
+### Refactor
+
+- **task**: add push origin main and tags into task publish
+
 ## 0.3.0 (2026-02-24)
 
 ### BREAKING CHANGE
