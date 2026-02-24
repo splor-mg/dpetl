@@ -8,6 +8,13 @@ def build_parser():
         description="ETL Command Line Interface",
     )
 
+    parser.add_argument(
+        '--descriptor',
+        '-d',
+        default='datapackage.yaml',
+        help='Path to a datapackage.yaml file (default: datapackage.yaml).',
+    )
+
     subparsers = parser.add_subparsers(
         title="commands",
         dest="command",
