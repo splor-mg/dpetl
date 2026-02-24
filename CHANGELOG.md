@@ -1,3 +1,17 @@
+## 0.3.0 (2026-02-24)
+
+### BREAKING CHANGE
+
+- See https://github.com/splor-mg/etl-cli/issues/6#issuecomment-3953910191
+
+### Feat
+
+- **dpetl**: change package name to dpetl
+
+### Refactor
+
+- **task**: add task bump
+
 ## 0.2.0 (2026-02-24)
 
 ### BREAKING CHANGE
