@@ -1,6 +1,6 @@
 [project]
 name = 'etl-cli'
-version = '0.1.0'
+version = "0.2.0"
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
@@ -19,6 +19,13 @@ dependencies = [
 upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
 
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "pep440"
+version_provider = "pep621"
+update_changelog_on_bump = true
+major_version_zero = true
 [build-system]
 requires = ['poetry-core>=2.0.0,<3.0.0']
 build-backend = 'poetry.core.masonry.api'
