@@ -68,4 +68,5 @@ format = { cmd = 'ruff format', help = 'Formats code according to code style con
 pre_test = { cmd = 'task lint', help = 'Runs linters before running the tests.' }
 test = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests.' }
 post_test = { cmd = 'coverage html', help = 'Generates a coverage report after the tests.' }
-publish = { cmd = "dotenv run poetry publish --build -n", help = "Publish the package on Pypi." }
+bump = { cmd = 'cz bump', help = 'Bumps project version.' }
+publish = { cmd = "task bump & dotenv run poetry publish --build -n", help = "Bumps version and publish the package on Pypi." }
