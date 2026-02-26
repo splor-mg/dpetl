@@ -1,3 +1,9 @@
+## 0.4.0 (2026-02-26)
+
+### Feat
+
+- **extract**: improves dpetl extract email
+
 ## 0.3.1 (2026-02-24)
 
 ### Refactor
