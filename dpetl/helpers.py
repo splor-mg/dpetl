@@ -1,6 +1,9 @@
+import logging
 from frictionless import Package
 from .extract import email
 from .extract import api
+
+logger = logging.getLogger(__name__)
 
 def resources_iteration(**kwargs):
     """
@@ -11,7 +14,25 @@ def resources_iteration(**kwargs):
         package = Package(descriptor)
 
     for resource in package.resources:
-        if resource.custom['extract_info']['mode'] == 'email':
+        mode = resource.custom.get('extract_info', {}).get('mode')
+
+        if not mode:
+            logger.error('Missing required extract_info.mode custom property at the resource level.',
+            extra={
+                'resource': resource.name,
+            },
+            )
+            return
+
+        logger.info(
+        'Starting resource extraction.',
+        extra={
+            'resource': resource.name,
+            'mode': mode,
+            },
+        )
+
+        if mode == 'email':
             email.extract_email(resource, **kwargs)
-        elif resource.custom['extract_info']['mode'] == 'api':
+        elif mode == 'api':
             api.extract_api(resource, **kwargs)

@@ -8,19 +8,12 @@ logger = logging.getLogger(__name__)
 
 def extract_email(resource, **kwargs):
     """
-    Extract the most recent email matching a subject and save its attachment
+    Extract the most recent email matching a subject and save its attachments
     to the given resource path.
     """
     resource_path = Path(resource.path)
-    subject = resource.custom.get('subject', resource.name)
-
-    logger.info(
-        'Starting email extraction.',
-        extra={
-            'subject': subject,
-            'destination': str(resource_path),
-        },
-    )
+    subject = resource.custom.get('extract_info', {}).get('subject',
+                                                          resource.name)
 
     try:
         resource_path.parent.mkdir(parents=True, exist_ok=True)
@@ -78,7 +71,7 @@ def extract_email(resource, **kwargs):
                     "from": msg.from_,
                 },
             )
-            
+
             if not msg.attachments:
                 logger.warning(
                     "Email found but no attachments presented.",
