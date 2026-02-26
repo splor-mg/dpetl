@@ -2,10 +2,11 @@ import argparse
 
 from .extract.cli import create_extract_subcommands
 
+
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="etl",
-        description="ETL Command Line Interface",
+        prog='etl',
+        description='ETL Command Line Interface',
     )
 
     parser.add_argument(
@@ -16,8 +17,8 @@ def build_parser():
     )
 
     subparsers = parser.add_subparsers(
-        title="commands",
-        dest="command",
+        title='commands',
+        dest='command',
         required=True,
     )
 
