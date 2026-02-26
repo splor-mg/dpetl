@@ -1,13 +1,16 @@
 import logging
+
 from frictionless import Package
-from .extract import email
-from .extract import api
+
+from .extract import api, email
 
 logger = logging.getLogger(__name__)
 
+
 def resources_iteration(**kwargs):
     """
-    Iterate on resources from a package descriptor or a package object and apply a function to each resource.
+    Iterate on resources from a package descriptor or a package object
+    and apply a function to each resource.
     """
     descriptor = kwargs.get('descriptor')
     if descriptor:
@@ -17,18 +20,20 @@ def resources_iteration(**kwargs):
         mode = resource.custom.get('dptel_extract', {}).get('mode')
 
         if not mode:
-            logger.error('Missing required dptel_extract.mode custom property at the resource level.',
-            extra={
-                'resource': resource.name,
-            },
+            logger.error(
+                'Missing required dptel_extract.mode custom property \
+                at the resource level.',
+                extra={
+                    'resource': resource.name,
+                },
             )
             return
 
         logger.info(
-        'Starting resource extraction.',
-        extra={
-            'resource': resource.name,
-            'mode': mode,
+            'Starting resource extraction.',
+            extra={
+                'resource': resource.name,
+                'mode': mode,
             },
         )
 
