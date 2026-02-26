@@ -85,7 +85,7 @@ def extract_email(resource, **kwargs):
                     extra={"criteria": str(criteria)},
                 )
 
-            for att in msg.attachments:
+            for index, att in enumerate(msg.attachments):
                 logger.debug(
                     "Processing attachment.",
                     extra={
@@ -94,14 +94,15 @@ def extract_email(resource, **kwargs):
                     },
                 )
 
-                with open(resource_path, "wb") as f:
+                path = resource_path if index == 0 else f'{resource_path}_{index}'
+                with open(path, 'wb') as f:
                     f.write(att.payload)
 
                 logger.info(
                     "Attachment saved successfully.",
                     extra={
                         "filename": att.filename,
-                        "saved_to": str(resource_path),
+                        "saved_to": str(path),
                     },
                 )
 
