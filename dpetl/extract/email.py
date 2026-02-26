@@ -11,21 +11,28 @@ def extract_email(resource, **kwargs):
     Extract the most recent email matching a subject and save its attachments
     to the given resource path.
     """
-    resource_path = Path(resource.path)
-    subject = resource.custom.get('dptel_extract', {}).get('subject',
-                                                          resource.name)
 
     try:
+        resource_path = Path(resource.path)
+        dptel_extract = resource.custom.get('dptel_extract', {})
+        criteria = dptel_extract.get('criteria', {})
+        # Only set subject to resource.name if this key doesn't exists on dpetl_extract.criteria custom property
+        # Could be dangerous because it changes criteria dict in place
+        criteria.setdefault('subject', resource.name)
+
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         load_dotenv(find_dotenv(usecwd=True))
         email_user = os.environ.get('EMAIL_USER')
         email_pwd = os.environ.get('EMAIL_PWD')
         email_smtp = os.environ.get('EMAIL_SMTP')
-        email_box =  os.environ.get('EMAIL_BOX')
+        email_box = dptel_extract.get('mailbox', 'INBOX')
 
-        if not all([email_user, email_pwd, email_smtp, email_box]):
-            logger.error('Missing required email environment variables.')
+        if not all([email_user, email_pwd, email_smtp]):
+            logger.error('Missing one of the required email environment variables: email_user, email_pwd or email_smtp.')
             return
+
+        if 'mailbox' not in dptel_extract:
+            logger.debug("Using default mailbox 'INBOX'.")
 
         logger.debug(
             'Connecting to mailbox.',
@@ -43,10 +50,10 @@ def extract_email(resource, **kwargs):
             mailbox.folder.set(email_box)
             logger.info("Mailbox folder selected.", extra={"folder": email_box})
 
-            criteria = AND(subject=subject)
+            search_query = AND(**criteria)
             logger.debug("Searching emails.", extra={"criteria": str(criteria)})
 
-            msgs = list(mailbox.fetch(criteria, limit=1, reverse=True))
+            msgs = list(mailbox.fetch(search_query, limit=1, reverse=True))
 
             if not msgs:
                 logger.warning(
@@ -94,7 +101,11 @@ def extract_email(resource, **kwargs):
                     },
                 )
 
-                path = resource_path if index == 0 else f'{resource_path}_{index}'
+                path = (
+                resource_path
+                if index == 0
+                else resource_path.with_name(f"{resource_path.name}_{index}")
+                )
                 with open(path, 'wb') as f:
                     f.write(att.payload)
 
@@ -109,10 +120,4 @@ def extract_email(resource, **kwargs):
         logger.info("Email extraction completed successfully.")
 
     except Exception:
-        logger.exception(
-            "Unexpected error during email extraction.",
-            extra={
-                "subject": subject,
-                "destination": str(resource_path),
-            },
-        )
+        logger.exception("Unexpected error during email extraction.")
