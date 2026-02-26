@@ -12,7 +12,7 @@ def extract_email(resource, **kwargs):
     to the given resource path.
     """
     resource_path = Path(resource.path)
-    subject = resource.custom.get('extract_info', {}).get('subject',
+    subject = resource.custom.get('dptel_extract', {}).get('subject',
                                                           resource.name)
 
     try:

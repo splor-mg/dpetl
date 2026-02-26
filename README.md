@@ -39,7 +39,7 @@ dpetl extract -d path/to/datapackage.yaml
 
 ### How it works
 
-The CLI loads the [descriptor](https://datapackage.org/standard/data-package/) (via [`frictionless-py`](https://github.com/frictionlessdata/frictionless-py) package) and iterates over all its [resources](https://datapackage.org/standard/data-resource/). For each resource the extractor reads the custom property `extract_info` and its key `mode` to call the corresponding process (at the moment the `api` and `email` are the available options).
+The CLI loads the [descriptor](https://datapackage.org/standard/data-package/) (via [`frictionless-py`](https://github.com/frictionlessdata/frictionless-py) package) and iterates over all its [resources](https://datapackage.org/standard/data-resource/). For each resource the extractor reads the custom property `dptel_extract` and its key `mode` to call the corresponding process (at the moment the `api` and `email` are the available options).
 
 Data package snippet example:
 
@@ -51,12 +51,12 @@ resources:
 		sources:
 			- method: get
 				path: https://api.example.com/invoices
-    extract_info:
+    dptel_extract:
       mode: api
 
 	- name: payroll_from_email
 		path: data/payroll.xlsx
-    extract_info:
+    dptel_extract:
       mode: email
     subject: "Payroll Report"
 ```
