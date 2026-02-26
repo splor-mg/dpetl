@@ -1,67 +1,119 @@
-# dpetl — simple ETL CLI using Frictionless
+# dpetl — Simple ETL CLI using Frictionless
 
-The `dpetl` is a [command-line interface](https://en.wikipedia.org/wiki/Command-line_interface) tool to assist running all the three phases of the [ETL](https://en.wikipedia.org/wiki/Extract,_transform,_load) process (although currently only the extract is implemented).
-It was designing to work alongside the [Data Package standard specification](https://datapackage.org/).
+`dpetl` is a command-line interface (CLI) tool designed to assist in running the three phases of the ETL (Extract, Transform, Load) process — although currently only the **extract** phase is implemented.
 
-### Installation
+It is designed to work alongside the [Data Package standard specification](https://datapackage.org/).
 
-Install it using pip:
+## Installation
+
+Install using pip:
 
 ```bash
 pip install dpetl
 ```
 
-### Usage
+## Usage
 
-Use the `--help` flag to read the CLI documentation on the terminal:
+Use the `--help` flag to inspect the CLI documentation:
 
 ```bash
 dpetl --help
 ```
 
-As said, only the `extract` command is implemented:
+Currently, only the `extract` command is available:
 
 ```bash
 # Run extract using the default datapackage.yaml descriptor
 dpetl extract
 
-# Or infor its path explicitly using the -d flag
+# Specify a descriptor explicitly
 dpetl extract -d path/to/datapackage.yaml
+# or
+dpetl extract --descriptor path/to/datapackage.yaml
 ```
 
-```bash
-# run extract using the default datapackage descriptor
-dpetl extract --descriptor datapackage.yaml
+## How It Works
 
-# or explicitly
-dpetl extract -d path/to/datapackage.yaml
+The CLI loads a Data Package descriptor (via the [`frictionless-py` Python package](https://framework.frictionlessdata.io/blog/2022/08-22-frictionless-framework-v5.html)) and iterates over its resources.
+
+For each resource, `dpetl extract` comand reads the custom property:
+
+```yaml
+dptel_extract:
 ```
 
-### How it works
+The key `mode` determines which extractor will run.
 
-The CLI loads the [descriptor](https://datapackage.org/standard/data-package/) (via [`frictionless-py`](https://github.com/frictionlessdata/frictionless-py) package) and iterates over all its [resources](https://datapackage.org/standard/data-resource/). For each resource the extractor reads the custom property `dptel_extract` and its key `mode` to call the corresponding process (at the moment the `api` and `email` are the available options).
+Currently available modes:
 
-Data package snippet example:
+* `api`.
+* `email`.
+
+## Example Data Package Configuration
 
 ```yaml
 # datapackage.yaml
 resources:
-	- name: invoices
-		path: data/invoices.csv
-		sources:
-			- method: get
-				path: https://api.example.com/invoices
-    dptel_extract:
-      mode: api
+  - name: invoices
+    path: data/invoices.csv
+    sources:
+      - method: get
+        path: https://api.example.com/invoices
+    custom:
+      dptel_extract:
+        mode: api
 
-	- name: payroll_from_email
-		path: data/payroll.xlsx
-    dptel_extract:
-      mode: email
-    subject: "Payroll Report"
+  - name: payroll_from_email
+    path: data/payroll.xlsx
+    custom:
+      dptel_extract:
+        mode: email
+        mailbox: INBOX  # optional (defaults to INBOX)
+        criteria:
+          subject: "Payroll Report" # optional (defaults to resource name)
 ```
 
-Notes:
+## Extractors
 
-- The `api` extractor checks `resource.sources` for an entry with a `method`, and the downloaded file is safe to `resource.path`.
-- The `email` extractor uses environment variables to connect to an IMAP server (`EMAIL_USER`, `EMAIL_PWD`, `EMAIL_SMTP`, `EMAIL_BOX`). It searches by `resource.custom['subject']` (defaulting to the resource `name`) and saves the latest matching attachment to `resource.path`.
+### Email Extractor
+
+* Connects to an IMAP server using environment variables:
+
+  * `EMAIL_USER`.
+  * `EMAIL_PWD`.
+  * `EMAIL_SMTP`.
+
+* Reads configuration from:
+
+```yaml
+dptel_extract:
+  mode: email
+  mailbox: INBOX        # optional (default: INBOX)
+  criteria:             # optional
+    subject: "Report"   # optional (default: resource.name)
+    from_: "finance@example.com" # optional
+    date_gte: 2024-01-01 #optional
+```
+
+Behavior:
+
+* If `mailbox` is not provided, `INBOX` is used.
+* If `criteria.subject` is not provided, it defaults to the resource `name`.
+* The extractor searches for the most recent matching email.
+* All e-mail attachments are saved to `resource.path`.
+
+### API Extractor
+
+* Reads `resource.sources`.
+* Searches for a source containing a `method`.
+* Downloads the file.
+* Saves it to `resource.path`.
+
+
+## Design Philosophy
+
+The `dpetl` package follows a [convention over configuration](https://en.wikipedia.org/wiki/Convention_over_configuration) philosophy, treating the Data Package descriptor as the single source of truth for ETL process.
+
+Each resource declares how it should be processed through structured metadata, enabling reproducible, declarative, and version-controlled data workflows.
+
+The goal is to keep the CLI simple while allowing flexible strategies driven entirely by configuration rather than imperative scripting.
