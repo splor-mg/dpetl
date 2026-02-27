@@ -32,8 +32,8 @@ def extract_email(resource, **kwargs):
 
         if not all([email_user, email_pwd, email_smtp]):
             logger.error(
-                'Missing one of the required email environment variables: \
-                email_user, email_pwd or email_smtp.'
+                ('Missing one of the required email environment variables:'
+                ('email_user, email_pwd or email_smtp.')
             )
             return
 

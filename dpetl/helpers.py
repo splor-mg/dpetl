@@ -21,8 +21,8 @@ def resources_iteration(**kwargs):
 
         if not mode:
             logger.error(
-                'Missing required dpetl_extract.mode custom property \
-                at the resource level.',
+                ('Missing required dpetl_extract.mode custom property'
+                'at the resource level.'),
                 extra={
                     'resource': resource.name,
                 },
