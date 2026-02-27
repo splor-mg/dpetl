@@ -1,3 +1,13 @@
+## 0.4.2 (2026-02-26)
+
+### Fix
+
+- **fix-sintaxe-error**: remove ( from long text
+
+### Refactor
+
+- **extract**: improve code formating
+
 ## 0.4.1 (2026-02-26)
 
 ### Fix
