@@ -33,7 +33,7 @@ def extract_email(resource, **kwargs):
         if not all([email_user, email_pwd, email_smtp]):
             logger.error(
                 ('Missing one of the required email environment variables:'
-                ('email_user, email_pwd or email_smtp.')
+                'email_user, email_pwd or email_smtp.')
             )
             return
 
@@ -56,7 +56,6 @@ def extract_email(resource, **kwargs):
             logger.info(
                 'Mailbox folder selected.', extra={'folder': email_box}
             )
-
             search_query = AND(**criteria)
             logger.debug(
                 'Searching emails.', extra={'criteria': str(criteria)}
