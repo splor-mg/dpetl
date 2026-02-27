@@ -16,8 +16,8 @@ def extract_email(resource, **kwargs):
 
     try:
         resource_path = Path(resource.path)
-        dptel_extract = resource.custom.get('dptel_extract', {})
-        criteria = dptel_extract.get('criteria', {})
+        dpetl_extract = resource.custom.get('dpetl_extract', {})
+        criteria = dpetl_extract.get('criteria', {})
         # Only set subject to resource.name if this key doesn't exists
         # on dpetl_extract.criteria custom property
         # Could be dangerous because it changes criteria dict in place
@@ -28,7 +28,7 @@ def extract_email(resource, **kwargs):
         email_user = os.environ.get('EMAIL_USER')
         email_pwd = os.environ.get('EMAIL_PWD')
         email_smtp = os.environ.get('EMAIL_SMTP')
-        email_box = dptel_extract.get('mailbox', 'INBOX')
+        email_box = dpetl_extract.get('mailbox', 'INBOX')
 
         if not all([email_user, email_pwd, email_smtp]):
             logger.error(
@@ -37,7 +37,7 @@ def extract_email(resource, **kwargs):
             )
             return
 
-        if 'mailbox' not in dptel_extract:
+        if 'mailbox' not in dpetl_extract:
             logger.debug("Using default mailbox 'INBOX'.")
 
         logger.debug(

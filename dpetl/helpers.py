@@ -17,11 +17,11 @@ def resources_iteration(**kwargs):
         package = Package(descriptor)
 
     for resource in package.resources:
-        mode = resource.custom.get('dptel_extract', {}).get('mode')
+        mode = resource.custom.get('dpetl_extract', {}).get('mode')
 
         if not mode:
             logger.error(
-                'Missing required dptel_extract.mode custom property \
+                'Missing required dpetl_extract.mode custom property \
                 at the resource level.',
                 extra={
                     'resource': resource.name,
