@@ -38,6 +38,6 @@ def resources_iteration(**kwargs):
         )
 
         if mode == 'email':
-            email.extract_email(resource, **kwargs)
+            email.email_connection(resource, **kwargs)
         elif mode == 'api':
             api.extract_api(resource, **kwargs)
