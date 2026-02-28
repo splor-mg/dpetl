@@ -7,12 +7,12 @@ def create_extract_subcommands(subparsers):
         'extract', help='Simplified some ETL extract operations.'
     )
 
-    # parser.add_argument(
-    #     '--today-mail',
-    #     '-t',
-    #     action='store_true',
-    #     help='Extract e-mails for today.',
-    # )
+    parser.add_argument(
+        '--today-email',
+        '-t',
+        action='store_true',
+        help='Extract e-mails received in the same date the command runs.',
+    )
 
     parser.set_defaults(func=handle_command)
 

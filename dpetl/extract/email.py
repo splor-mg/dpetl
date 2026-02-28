@@ -59,7 +59,7 @@ def extract_email(mailbox, resource, **kwargs):
         name = resource_path.stem
         criteria = resource.custom.get('dpetl_extract', {}).get('criteria', {})
         criteria['subject'] = f'{package_name}_{name}'
-        # criteria['date_gte'] = datetime.date.today()  if kwargs.get('today_mail') else None
+        criteria['date_gte'] = datetime.date.today()  if kwargs.get('--today-email') else None
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         search_query = AND(**criteria)
         logger.debug(
