@@ -1,3 +1,9 @@
+## 0.5.1 (2026-03-02)
+
+### Fix
+
+- **pyproject**: downgrade python version required
+
 ## 0.5.0 (2026-03-02)
 
 ### Feat
