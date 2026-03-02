@@ -1,6 +1,6 @@
 [project]
 name = 'dpetl'
-version = "0.5.1"
+version = '0.5.1'
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
@@ -9,22 +9,26 @@ readme = 'README.md'
 requires-python = '>=3.10,<4.0'
 dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
-    "python-dotenv (>=1.2.1,<2.0.0)",
-    "imap-tools (>=1.11.1,<2.0.0)",
-    "frictionless[pandas] (>=5.18.1,<6.0.0)",
-    "pysocks (>=1.7.1,<2.0.0)"
+    'python-dotenv (>=1.2.1,<2.0.0)',
+    'imap-tools (>=1.11.1,<2.0.0)',
+    'frictionless[pandas] (>=5.18.1,<6.0.0)',
+    'pysocks (>=1.7.1,<2.0.0)'
 ]
 
+[project.urls]
+Homepage = 'https://github.com/gabrielbdornas/dpetl'
+Repository = 'https://github.com/gabrielbdornas/dpetl'
+Source = 'https://github.com/gabrielbdornas/dpetl'
 
 [tool.repo-template]
 upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
 
 [tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "pep440"
-version_provider = "pep621"
+name = 'cz_conventional_commits'
+tag_format = '$version'
+version_scheme = 'pep440'
+version_provider = 'pep621'
 update_changelog_on_bump = true
 major_version_zero = true
 [build-system]
@@ -40,10 +44,10 @@ dev = [
 ]
 
 [project.scripts]
-dpetl = "dpetl.cli:main"
+dpetl = 'dpetl.cli:main'
 
 [tool.poetry]
-packages = [{ include = "dpetl" }]
+packages = [{ include = 'dpetl' }]
 
 [tool.ruff]
 line-length = 79
@@ -70,4 +74,4 @@ pre_test = { cmd = 'task lint', help = 'Runs linters before running the tests.' 
 test = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests.' }
 post_test = { cmd = 'coverage html', help = 'Generates a coverage report after the tests.' }
 bump = { cmd = 'cz bump', help = 'Bumps project version.' }
-publish = { cmd = "task bump && dotenv run poetry publish --build -n && git push origin main --tags", help = "Bumps version and publish the package on Pypi." }
+publish = { cmd = 'task bump && dotenv run poetry publish --build -n && git push origin main --tags', help = 'Bumps version and publish the package on Pypi.' }
