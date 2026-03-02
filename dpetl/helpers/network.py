@@ -1,9 +1,10 @@
 import os
 import socket
-import socks
 from urllib.parse import urlparse
 
+import socks
 from dotenv import find_dotenv, load_dotenv
+
 
 def force_ipv4():
     original_getaddrinfo = socket.getaddrinfo
@@ -19,6 +20,7 @@ def force_ipv4():
         )
 
     socket.getaddrinfo = getaddrinfo_ipv4
+
 
 def configure_proxy_from_env():
     load_dotenv(find_dotenv(usecwd=True))
