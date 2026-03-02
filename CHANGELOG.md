@@ -1,3 +1,15 @@
+## 0.5.0 (2026-03-02)
+
+### Feat
+
+- **helpers**: add network helper
+- **extract**: add --today-email flag
+- **extract**: add multipart file extract func
+
+### Refactor
+
+- **.env**: change smtp env varts to imap
+
 ## 0.4.2 (2026-02-26)
 
 ### Fix
