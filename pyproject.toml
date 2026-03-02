@@ -11,7 +11,8 @@ dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
     "python-dotenv (>=1.2.1,<2.0.0)",
     "imap-tools (>=1.11.1,<2.0.0)",
-    "frictionless[pandas] (>=5.18.1,<6.0.0)"
+    "frictionless[pandas] (>=5.18.1,<6.0.0)",
+    "pysocks (>=1.7.1,<2.0.0)"
 ]
 
 

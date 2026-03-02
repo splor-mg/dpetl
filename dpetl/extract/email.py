@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 from pathlib import Path
+from dpetl.helpers.network import configure_proxy_from_env
 
 from dotenv import find_dotenv, load_dotenv
 from imap_tools import AND, MailBox
@@ -32,6 +33,7 @@ def email_connection(resource, **kwargs):
         )
         return
 
+    configure_proxy_from_env()
     with MailBox(email_imap).login(email_user, email_pwd) as mailbox:
         logger.info('Connected to e-mail successfully.')
 
@@ -59,7 +61,7 @@ def extract_email(mailbox, resource, **kwargs):
         name = resource_path.stem
         criteria = resource.custom.get('dpetl_extract', {}).get('criteria', {})
         criteria['subject'] = f'{package_name}_{name}'
-        criteria['date_gte'] = datetime.date.today()  if kwargs.get('--today-email') else None
+        criteria['date_gte'] = datetime.date.today()  if kwargs.get('today_email') else None
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         search_query = AND(**criteria)
         logger.debug(

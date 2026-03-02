@@ -80,6 +80,9 @@ resources:
   * `EMAIL_USER`.
   * `EMAIL_PWD`.
   * `EMAIL_IMAP`.
+	* `HTTP_PROXY`[^1].
+
+[^1]: Just in case you're running the command behind a corporate network that demands proxy configuration. The `HTTPS_PROXY`, `http_proxy` and `https_proxy` are equally acceptable. See [this Issue's comment](https://github.com/splor-mg/dpetl/issues/18#issuecomment-3986578696) to understand why maybe you'll have to add authentication (`http://<user>:<pwd>@<host>:<port>`) on PROXY address.
 
 * Reads configuration from:
 
