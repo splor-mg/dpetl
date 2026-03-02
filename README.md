@@ -1,6 +1,6 @@
-# dpetl — Simple ETL CLI using Frictionless
+# dpetl — Data package ETL
 
-`dpetl` is a command-line interface (CLI) tool designed to assist in running the three phases of the ETL (Extract, Transform, Load) process — although currently only the **extract** phase is implemented.
+`dpetl` is a command-line interface (CLI) tool designed to assist in running the three phases of the ETL (Extract, Transform, Load) process (although currently only the **extract** phase is implemented).
 
 It is designed to work alongside the [Data Package standard specification](https://datapackage.org/).
 
@@ -59,18 +59,16 @@ resources:
     sources:
       - method: get
         path: https://api.example.com/invoices
-    custom:
-      dptel_extract:
-        mode: api
+		dptel_extract:
+			mode: api
 
   - name: payroll_from_email
     path: data/payroll.xlsx
-    custom:
-      dptel_extract:
-        mode: email
-        mailbox: INBOX  # optional (defaults to INBOX)
-        criteria:
-          subject: "Payroll Report" # optional (defaults to resource name)
+		dptel_extract:
+			mode: email
+			mailbox: INBOX  # optional (defaults to INBOX)
+			criteria:
+				subject: "Payroll Report" # optional (defaults to resource name)
 ```
 
 ## Extractors
@@ -97,8 +95,8 @@ dptel_extract:
 
 Behavior:
 
-* If `mailbox` is not provided, `INBOX` is used.
-* If `criteria.subject` is not provided, it defaults to the resource `name`.
+* If `dptel_extract.mailbox` is not provided, `INBOX` is used.
+* If `dptel_extract.criteria.subject` is not provided, it defaults to the resource `name`.
 * The extractor searches for the most recent matching email.
 * All e-mail attachments are saved to `resource.path`.
 
