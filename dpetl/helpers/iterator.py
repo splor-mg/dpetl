@@ -2,7 +2,7 @@ import logging
 
 from frictionless import Package
 
-from .extract import api, email
+from dpetl.extract import api, email
 
 logger = logging.getLogger(__name__)
 

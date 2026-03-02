@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 from pathlib import Path
+from dpetl.helpers.network import configure_proxy_from_env
 
 from dotenv import find_dotenv, load_dotenv
 from imap_tools import AND, MailBox
@@ -22,17 +23,18 @@ def email_connection(resource, **kwargs):
     load_dotenv(find_dotenv(usecwd=True))
     email_user = os.environ.get('EMAIL_USER')
     email_pwd = os.environ.get('EMAIL_PWD')
-    email_smtp = os.environ.get('EMAIL_SMTP')
+    email_imap = os.environ.get('EMAIL_IMAP')
     email_box = dptel_extract.get('mailbox', 'INBOX')
 
-    if not all([email_user, email_pwd, email_smtp]):
+    if not all([email_user, email_pwd, email_imap]):
         logger.error(
             ('Missing one of the required e-mail environment variables:'
-            'email_user, email_pwd or email_smtp.')
+            'email_user, email_pwd or email_imap.')
         )
         return
 
-    with MailBox(email_smtp).login(email_user, email_pwd) as mailbox:
+    configure_proxy_from_env()
+    with MailBox(email_imap).login(email_user, email_pwd) as mailbox:
         logger.info('Connected to e-mail successfully.')
 
         mailbox.folder.set(email_box)
@@ -59,7 +61,7 @@ def extract_email(mailbox, resource, **kwargs):
         name = resource_path.stem
         criteria = resource.custom.get('dpetl_extract', {}).get('criteria', {})
         criteria['subject'] = f'{package_name}_{name}'
-        # criteria['date_gte'] = datetime.date.today()  if kwargs.get('today_mail') else None
+        criteria['date_gte'] = datetime.date.today()  if kwargs.get('today_email') else None
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         search_query = AND(**criteria)
         logger.debug(
