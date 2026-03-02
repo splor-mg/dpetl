@@ -79,7 +79,7 @@ resources:
 
   * `EMAIL_USER`.
   * `EMAIL_PWD`.
-  * `EMAIL_SMTP`.
+  * `EMAIL_IMAP`.
 
 * Reads configuration from:
 
