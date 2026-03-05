@@ -14,6 +14,13 @@ def create_extract_subcommands(subparsers):
         help='Extract e-mails received in the same date the command runs.',
     )
 
+    parser.add_argument(
+        '--add-package-name',
+        '-a',
+        action='store_true',
+        help='Add the package name to the subject property. This will search for a subejct pattern like {package_name}_{resource_name} instead of just {resource_name}.',
+    )
+
     parser.set_defaults(func=handle_command)
 
     return parser
