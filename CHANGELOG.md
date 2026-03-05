@@ -1,3 +1,13 @@
+## 0.6.0 (2026-03-05)
+
+### Feat
+
+- **extract**: add --add-package-name to extract command
+
+### Refactor
+
+- **format**: run task format
+
 ## 0.5.1 (2026-03-02)
 
 ### Fix
