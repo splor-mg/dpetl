@@ -61,8 +61,35 @@ def extract_email(mailbox, resource, **kwargs):
         package_name = resource.package.name
         resource_path = Path(resource.path)
         name = resource_path.stem
-        criteria = resource.custom.get('dpetl_extract', {}).get('criteria', {})
-        criteria['subject'] = f'{package_name}_{name}'
+
+        criteria = resource.custom.get('dpetl_extract', {}).get('criteria')
+        add_package_name = kwargs.get('add_package_name')
+        subject = criteria.get('subject')
+        if len(resource.extrapaths) > 0:
+            logger.debug(
+                'Using defined pattern as subject could not be defined in multipart file resources.',
+                extra={'criteria': str(criteria),
+                       'resource': resource.name,
+                       },
+            )
+            criteria['subject'] = f'{package_name}_{name}' if add_package_name else name
+        # If subject is already defined in the resource criteria, the flag
+        # --add-package-name will be ignored and a debug log will be generated
+        # to inform about it.
+        # This is because the user is explicitly defining the subject pattern
+        # to search for and adding the package name would change this pattern.
+        elif subject and add_package_name:
+            logger.debug(
+                'Flag --add-package-name no applied as subject is defined in this resource.',
+                extra={'criteria': str(criteria),
+                       'resource': resource.name,
+                       },
+            )
+        elif not subject and not add_package_name:
+            criteria['subject'] = name
+        elif not subject and add_package_name:
+            criteria['subject'] = f'{package_name}_{name}'
+
         today = datetime.date.today()
         criteria['date_gte'] = today if kwargs.get('today_email') else None
         resource_path.parent.mkdir(parents=True, exist_ok=True)
