@@ -1,4 +1,4 @@
-from dpetl.helpers.iterator import resources_iteration
+from dpetl.helpers.iterator import descriptor_iteration
 
 
 def create_extract_subcommands(subparsers):
@@ -28,4 +28,4 @@ def create_extract_subcommands(subparsers):
 
 def handle_command(args):
 
-    resources_iteration(**vars(args))
+    descriptor_iteration(**vars(args))
