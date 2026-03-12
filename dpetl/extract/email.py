@@ -58,13 +58,14 @@ def extract_email(mailbox, resource, **kwargs):
     to the given resource path.
     """
     try:
-        package_name = resource.package.name
-        resource_path = Path(resource.path)
+        package = resource.package
+        package_name = package.name
+        resource_path = Path(package._basepath) / resource.path
         name = resource_path.stem
-
         criteria = resource.custom.get('dpetl_extract', {}).get('criteria')
         add_package_name = kwargs.get('add_package_name')
         subject = criteria.get('subject')
+
         if len(resource.extrapaths) > 0:
             logger.debug(
                 'Using defined pattern as subject could not be defined in multipart file resources.',

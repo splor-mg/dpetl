@@ -1,4 +1,5 @@
 import logging
+import tomllib
 
 from frictionless import Package
 
@@ -6,16 +7,39 @@ from dpetl.extract import api, email
 
 logger = logging.getLogger(__name__)
 
+def descriptor_iteration(**kwargs):
+    """
+    Iterate on package(s) descriptor(s) and apply a function to each package.
+    """
+    descriptor = kwargs.get('descriptor')
+    descriptor_suffix = descriptor.split('.')[-1]
+    if descriptor_suffix == 'toml':
+        with open(descriptor, "rb") as f:
+            descriptors = tomllib.load(f)
 
-def resources_iteration(**kwargs):
+        for descriptor in descriptors['datapackages'].values():
+            package = Package(descriptor['path'])
+            resources_iteration(package, **kwargs)
+
+    elif descriptor_suffix in ['yaml', 'yml', 'json']:
+        package = Package(descriptor)
+        if not package:
+            logger.error(
+                'Descriptor does not create a valid package.',
+                extra={
+                    'package': package.name,
+                },
+            )
+            return
+        resources_iteration(package, **kwargs)
+
+def resources_iteration(package, **kwargs):
     """
     Iterate on resources from a package descriptor or a package object
     and apply a function to each resource.
     """
-    descriptor = kwargs.get('descriptor')
-    if descriptor:
-        package = Package(descriptor)
 
+    # TODO: Support all three ETL operations
     for resource in package.resources:
         mode = resource.custom.get('dpetl_extract', {}).get('mode')
 
