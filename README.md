@@ -1,5 +1,7 @@
 # dpetl — Data package ETL
 
+[![Release](https://img.shields.io/pypi/v/dpetl.svg)](https://pypi.python.org/pypi/dpetl)
+
 The `dpetl` is a command-line interface (CLI) tool designed to run the three ETL phases (Extract, Transform, Load)[^1]
 
 [^1]: Although currently only the **Extract** phase is implemented.
