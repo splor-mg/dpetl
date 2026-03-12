@@ -1,18 +1,27 @@
 # dpetl — Data package ETL
 
-`dpetl` is a command-line interface (CLI) tool designed to assist in running the three phases of the ETL (Extract, Transform, Load) process (although currently only the **extract** phase is implemented).
+The `dpetl` is a command-line interface (CLI) tool designed to run the three ETL phases (Extract, Transform, Load)[^1]
+
+[^1]: Although currently only the **Extract** phase is implemented.
 
 It is designed to work alongside the [Data Package standard specification](https://datapackage.org/).
 
 ## Installation
 
-Install using pip:
+It requires Python 3.10 or more.
+Install:
 
 ```bash
+# using pip
 pip install dpetl
+
+# using poetry
+poetry add dpetl
 ```
 
 ## Usage
+
+Active your virtual environment!
 
 Use the `--help` flag to inspect the CLI documentation:
 
@@ -34,20 +43,29 @@ dpetl extract --descriptor path/to/datapackage.yaml
 
 ## How It Works
 
-The CLI loads a Data Package descriptor (via the [`frictionless-py` Python package](https://framework.frictionlessdata.io/blog/2022/08-22-frictionless-framework-v5.html)) and iterates over its resources.
+The CLI loads Data Package descriptor(s) (via the [`frictionless-py` Python package](https://framework.frictionlessdata.io/blog/2022/08-22-frictionless-framework-v5.html)) and iterates over its resources.
 
-For each resource, `dpetl extract` comand reads the custom property:
+A `.toml` file could also be provided as a descriptor (using the `-d` flag) to run the command(s) recursively.
+Please create a `.toml` file following the below pattern:
 
-```yaml
-dptel_extract:
+```toml
+title = 'dados_orcamentarios'
+
+[datapackages] # required
+
+[datapackages.dados_siafi]
+path = 'datapackages/dados_siafi/datapackage.yaml' # descriptor required via path property
+
+[datapackages.dados_sisor]
+path = 'datapackages/dados_sisor/datapackage.yaml' # descriptor required via path property
 ```
 
+For each resource found, `dpetl extract` command reads its `dpetl_extract` custom property:
 The key `mode` determines which extractor will run.
+Currently, available modes are:
 
-Currently available modes:
-
-* `api`.
-* `email`.
+- `api`.
+- `email`.
 
 ## Example Data Package Configuration
 
@@ -59,56 +77,58 @@ resources:
     sources:
       - method: get
         path: https://api.example.com/invoices
-		dptel_extract:
-			mode: api
+    dpetl_extract:
+      mode: api
 
   - name: payroll_from_email
     path: data/payroll.xlsx
-		dptel_extract:
-			mode: email
-			mailbox: INBOX  # optional (defaults to INBOX)
-			criteria:
-				subject: "Payroll Report" # optional (defaults to resource name)
+    dpetl_extract:
+      mode: email
+      mailbox: INBOX  # optional (Defaults to INBOX)
+      criteria:
+        subject: "Payroll Report" # optional (Defaults to resource name. See also the flag --add-package-name)
 ```
 
 ## Extractors
 
 ### Email Extractor
 
-* Connects to an IMAP server using environment variables:
+- Connects to an IMAP server using environment variables:
 
-  * `EMAIL_USER`.
-  * `EMAIL_PWD`.
-  * `EMAIL_IMAP`.
-	* `HTTP_PROXY`[^1].
+  - `EMAIL_USER`.
+  - `EMAIL_PWD`.
+  - `EMAIL_IMAP`.
+  - `HTTP_PROXY`[^2].
 
-[^1]: Just in case you're running the command behind a corporate network that demands proxy configuration. The `HTTPS_PROXY`, `http_proxy` and `https_proxy` are equally acceptable. See [this Issue's comment](https://github.com/splor-mg/dpetl/issues/18#issuecomment-3986578696) to understand why maybe you'll have to add authentication (`http://<user>:<pwd>@<host>:<port>`) on PROXY address.
+[^2]: Just in case you're running the command behind a corporate network that demands proxy configuration. The `HTTP_PROXY`, `HTTPS_PROXY`, `http_proxy` and `https_proxy` environment variables are equally acceptable. See [this Issue's comment](https://github.com/splor-mg/dpetl/issues/18#issuecomment-3986578696) to understand why maybe you'll have to add authentication (`http://<user>:<pwd>@<host>:<port>`) on PROXY address.
 
-* Reads configuration from:
+- Reads configuration from:
 
 ```yaml
-dptel_extract:
+dpetl_extract:
   mode: email
-  mailbox: INBOX        # optional (default: INBOX)
+  mailbox: INBOX        # optional (Defaults to INBOX)
   criteria:             # optional
-    subject: "Report"   # optional (default: resource.name)
+    subject: "Report"   # optional (Defaults to resource name. See also the flag --add-package-name)
     from_: "finance@example.com" # optional
-    date_gte: 2024-01-01 #optional
+    date_gte: 2024-01-01 #optional (See also the flag --today-email)
 ```
 
 Behavior:
 
-* If `dptel_extract.mailbox` is not provided, `INBOX` is used.
-* If `dptel_extract.criteria.subject` is not provided, it defaults to the resource `name`.
-* The extractor searches for the most recent matching email.
-* All e-mail attachments are saved to `resource.path`.
+- If `dpetl_extract.mailbox` is not provided, `INBOX` is used.
+- If `dpetl_extract.criteria.subject` is not provided, it defaults to the resource name.
+- If the flag `--add-package-name` is provided the e-mail subject pattern will be `{package_name}_{resource_name}` instead of just resource name.
+- If the flag `--today-email` is provided the date when the command runs will be used in the to search criteria.
+- The extractor searches for the most recent matching e-mail.
+- All e-mail attachments are saved to `resource.path`.
 
 ### API Extractor
 
-* Reads `resource.sources`.
-* Searches for a source containing a `method`.
-* Downloads the file.
-* Saves it to `resource.path`.
+- Reads `resource.sources`.
+- Searches for a source containing a `method`.
+- Downloads the file.
+- Saves it to `resource.path`.
 
 
 ## Design Philosophy
