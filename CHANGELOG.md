@@ -1,3 +1,13 @@
+## 0.7.0 (2026-03-12)
+
+### Feat
+
+- **extract**: add recursive extraction
+
+### Refactor
+
+- **.env**: remove .env.example
+
 ## 0.6.0 (2026-03-05)
 
 ### Feat
