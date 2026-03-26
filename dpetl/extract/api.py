@@ -1,5 +1,5 @@
 import requests
-
+from pathlib import Path
 
 def extract_api(resource, **kwargs):
     try:
@@ -18,6 +18,8 @@ def extract_api(resource, **kwargs):
                 stream=source.get('stream', False),
             )
             response.raise_for_status()
+
+        Path(resource.path).parent.mkdir(parents=True, exist_ok=True)
 
         with open(resource.path, 'wb') as f:
             f.write(response.content)
