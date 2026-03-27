@@ -64,4 +64,4 @@ def resources_iteration(package, **kwargs):
         if mode == 'email':
             email.email_connection(resource, **kwargs)
         elif mode == 'api':
-            api.extract_api(resource, **kwargs)
+            api.check_multipart_files(resource, **kwargs)

@@ -12,7 +12,8 @@ dependencies = [
     'python-dotenv (>=1.2.1,<2.0.0)',
     'imap-tools (>=1.11.1,<2.0.0)',
     'frictionless[pandas] (>=5.18.1,<6.0.0)',
-    'pysocks (>=1.7.1,<2.0.0)'
+    'pysocks (>=1.7.1,<2.0.0)',
+    "tqdm (>=4.67.3,<5.0.0)"
 ]
 
 [project.urls]
