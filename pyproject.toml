@@ -1,6 +1,6 @@
 [project]
 name = 'dpetl'
-version = "0.7.0"
+version = "0.8.0"
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}

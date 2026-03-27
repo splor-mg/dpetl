@@ -1,3 +1,14 @@
+## 0.8.0 (2026-03-26)
+
+### Feat
+
+- **extract**: add multpart file in extract api
+- **extract**: download and save files in chunck
+
+### Fix
+
+- **extract**: check if resource.path exists
+
 ## 0.7.0 (2026-03-12)
 
 ### Feat
