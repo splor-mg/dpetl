@@ -2,13 +2,26 @@ import requests
 from pathlib import Path
 from tqdm import tqdm
 
+def check_multipart_files(resource, **kwargs):
+
+    url = resource.sources[0]['path']
+    file_name = resource.path.split('/')[-1]
+    new_url = f'{url}/{file_name}'
+    resource.sources[0]['path'] = new_url
+    extract_api(resource, **kwargs)
+
+
+    if len(resource.extrapaths) > 0:
+        for extrapath in resource.extrapaths:
+            resource.path = extrapath
+            file_name = resource.path.split('/')[-1]
+            new_url = f'{url}/{file_name}'
+            resource.sources[0]['path'] = new_url
+            extract_api(resource, **kwargs)
+
 def extract_api(resource, **kwargs):
     try:
-        sources = resource.sources
-        sources = [
-            source for source in sources if source.get('method') is not None
-        ]
-        source = sources[0]
+        source = resource.sources[0]
         if source:
             func = getattr(requests, source['method'])
             response = func(
