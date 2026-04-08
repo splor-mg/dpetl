@@ -1,3 +1,4 @@
+import sys
 import datetime
 import logging
 import os
@@ -33,7 +34,7 @@ def email_connection(resource, **kwargs):
             ('Missing one of the required e-mail environment variables:'
             'email_user, email_pwd or email_imap.')
         )
-        return
+        sys.exit(1)
 
     configure_proxy_from_env()
     with MailBox(email_imap).login(email_user, email_pwd) as mailbox:
