@@ -1,3 +1,9 @@
+## 0.8.1 (2026-04-08)
+
+### Fix
+
+- **extract**: exit 1 when email vars aren't passed
+
 ## 0.8.0 (2026-03-26)
 
 ### Feat
