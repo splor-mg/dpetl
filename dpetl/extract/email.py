@@ -152,7 +152,7 @@ def extract_email(mailbox, resource, **kwargs):
                 resource_path
                 if index == 0
                 else resource_path.with_name(
-                    f'{resource_path.name}_{index}'
+                    f'{name}_{index}{resource_path.suffix}'
                 )
             )
             # Do not need to write in chuncks because mail fails are small
