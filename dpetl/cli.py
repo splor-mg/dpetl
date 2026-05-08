@@ -2,6 +2,7 @@ import argparse
 
 from .extract.cli import create_extract_subcommands
 from .transform.cli import create_transform_subcommands
+from .load.cli import create_load_subcommands
 
 def build_parser():
     parser = argparse.ArgumentParser(
@@ -24,6 +25,7 @@ def build_parser():
 
     create_extract_subcommands(subparsers)
     create_transform_subcommands(subparsers)
+    create_load_subcommands(subparsers)
 
     return parser
 
