@@ -45,20 +45,6 @@ def resources_iteration(package, **kwargs):
 
     # TODO: Support all three ETL operations
 
-    if operation == 'transform':
-
-        logger.info(
-            'Starting package transformation.',
-            extra={
-                'resource': package.name,
-            },
-        )
-
-        descriptor = Path(package.basepath) / 'datapackage.yaml'
-        transform.transform_resource(descriptor)
-
-        return
-
     if operation == 'extract':
         for resource in package.resources:
             mode = resource.custom.get('dpetl_extract', {}).get('mode')
@@ -85,6 +71,20 @@ def resources_iteration(package, **kwargs):
                 email.email_connection(resource, **kwargs)
             elif mode == 'api':
                 api.check_multipart_files(resource, **kwargs)
+
+        return
+
+    # Transform
+    if operation == 'transform':
+
+        logger.info(
+            'Starting package transformation.',
+            extra={
+                'resource': package.name,
+            },
+        )
+
+        transform.transform_resource(package)
 
         return
 

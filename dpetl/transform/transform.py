@@ -1,15 +1,21 @@
-from frictionless import Package
-from pathlib import Path
 import petl as etl
 
+from .datapackage import write_files, update_metadata, build_datapackage
 
-def transform_resource(descriptor):
-
-    datapackage = Path(descriptor)
-    package = Package(datapackage)
-    data = datapackage.parent / 'data'
+def transform_resource(package):
 
     for resource in package.resources:
+
+        dpetl = resource.custom.get('dpetl_transform', {})
+        path = dpetl.get('path') or 'data'
+        encoding = dpetl.get('encoding') or 'utf-8'
+        datapackage_format = dpetl.get('datapackage_format') or 'json'
+
+        parts = (dpetl.get('format') or 'csv.gz').split('.')
+        format = parts[0]
+        compression = (parts[1] if len(parts) > 1 else None)
+        extension = f'{format}.{compression}' if compression else format
+
         table = resource.to_petl()
 
         for field in resource.schema.fields:
@@ -17,4 +23,8 @@ def transform_resource(descriptor):
 
             table = etl.rename(table, field.name, target)
 
-        etl.tocsv(table, str(data / f'{resource.name}.csv.gz'), encoding='utf-8')
+        write_files(package, resource, path, format, extension, encoding, table)
+
+        update_metadata(resource, path, format, compression, extension)
+
+    build_datapackage(package, datapackage_format)
