@@ -36,7 +36,6 @@ def update_metadata(resource, path, format, compression, extension):
     for field in schema:
         field.custom.pop('target', None)
 
-    [resource.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform']]
     resource.extrapaths = None
     resource.infer(stats=True)
 

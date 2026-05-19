@@ -1,6 +1,5 @@
 import logging
 import tomllib
-from pathlib import Path
 from frictionless import Package
 
 from dpetl.extract import api, email
@@ -80,7 +79,7 @@ def resources_iteration(package, **kwargs):
         logger.info(
             'Starting package transformation.',
             extra={
-                'resource': package.name,
+                'package': package.name,
             },
         )
 
