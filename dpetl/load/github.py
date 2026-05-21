@@ -1,8 +1,10 @@
 import base64
+import logging
 import requests
+import subprocess
 from datetime import datetime
 
-GITHUB_API = 'https://api.github.com'
+logger = logging.getLogger(__name__)
 
 
 def repo_exists(owner, repo, token):
@@ -10,26 +12,26 @@ def repo_exists(owner, repo, token):
     Check if a GitHub repository exists for a given owner.
     """
 
-    url = f'{GITHUB_API}/repos/{owner}/{repo}'
+    url = f'https://api.github.com/repos/{owner}/{repo}'
     r = requests.get(url, headers={'Authorization': f'token {token}'})
     return r.status_code == 200
 
 
-def create_repo(owner, repo, token, private=False, org=False):
+def create_repo(owner, repo, token, level, visibility):
     """
     Create a new GitHub repository under a user or organization.
     """
 
     # Select correct endpoint: user or organization
-    if org:
-        url = f'{GITHUB_API}/orgs/{owner}/repos'
+    if level == 'orgs':
+        url = f'https://api.github.com/orgs/{owner}/repos'
     else:
-        url = f'{GITHUB_API}/user/repos'
+        url = f'https://api.github.com/user/repos'
 
     # Repository configuration
     payload = {
         'name': repo,
-        'private': private,
+        'private': visibility == 'private',
         'auto_init': True
     }
 
@@ -42,21 +44,27 @@ def create_repo(owner, repo, token, private=False, org=False):
     r.raise_for_status()
 
 
-def commit_files(owner, repo, token, files):
+def commit_remote(owner, repo, token, files):
     """
     Create a single commit with multiple files using the GitHub Git Data API.
     """
 
     # Base repository API URL and headers
-    url = f'{GITHUB_API}/repos/{owner}/{repo}'
+    url = f'https://api.github.com/repos/{owner}/{repo}'
 
     headers = {
         'Authorization': f'token {token}',
         'Accept': 'application/vnd.github+json'
     }
 
+    # Get repository information
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+
+    branch = r.json()['default_branch']
+
     # Retrieve current HEAD commit and tree
-    r = requests.get(f'{url}/git/refs/heads/main', headers=headers)
+    r = requests.get(f'{url}/git/refs/heads/{branch}', headers=headers)
     r.raise_for_status()
 
     sha = r.json()['object']['sha']
@@ -109,7 +117,26 @@ def commit_files(owner, repo, token, files):
 
     # Update branch to new commit
     requests.patch(
-        f'{url}/git/refs/heads/main',
+        f'{url}/git/refs/heads/{branch}',
         headers=headers,
         json={'sha': new_commit['sha']}
     )
+
+
+def commit_local(files):
+    """
+    Commit and push local repository changes.
+    """
+
+    subprocess.run(['git', 'add', '-f', *files.keys()], check=True)
+
+    changes = subprocess.run(['git', 'diff', '--cached', '--quiet'])
+    if changes.returncode == 0:
+        logger.info('No changes to commit.')
+        return
+
+    timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+
+    subprocess.run(['git', 'commit', '-m', f'update data package at: {timestamp}'], check=True)
+
+    subprocess.run(['git', 'push'], check=True)
