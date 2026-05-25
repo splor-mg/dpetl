@@ -71,8 +71,9 @@ list = { cmd = 'task --list', help = 'Lists all tasks.' }
 lint = { cmd = 'ruff check', help = 'Checks for good coding practices in Python.' }
 pre_format = { cmd = 'ruff check --fix', help = 'Makes some best practice corrections.' }
 format = { cmd = 'ruff format', help = 'Formats code according to code style conventions.' }
-pre_test = { cmd = 'task lint', help = 'Runs linters before running the tests.' }
-test = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests.' }
-post_test = { cmd = 'coverage html', help = 'Generates a coverage report after the tests.' }
+test = { cmd = 'pytest -vv --cov=dpetl --cov-report=term-missing --cov-report=xml', help = 'Runs unit tests with coverage.' }
+test_debug = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests in debug mode.' }
+coverage_html = { cmd = 'coverage html', help = 'Generates an HTML coverage report.' }
+check = { cmd = 'task lint && task test', help = 'Runs lint and tests.' }
 bump = { cmd = 'cz bump', help = 'Bumps project version.' }
 publish = { cmd = 'task bump && dotenv run poetry publish --build -n && git push origin main --tags', help = 'Bumps version and publish the package on Pypi.' }
