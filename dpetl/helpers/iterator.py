@@ -4,6 +4,7 @@ from frictionless import Package
 
 from dpetl.extract import api, email
 from dpetl.transform import transform
+from dpetl.load import load
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +43,7 @@ def resources_iteration(package, **kwargs):
     """
     operation = kwargs.get('operation')
 
-    # TODO: Support all three ETL operations
-
+    # Extract
     if operation == 'extract':
         for resource in package.resources:
             mode = resource.custom.get('dpetl_extract', {}).get('mode')
@@ -84,6 +84,20 @@ def resources_iteration(package, **kwargs):
         )
 
         transform.transform_resource(package)
+
+        return
+
+    #Load
+    if operation == 'load':
+
+        logger.info(
+            'Starting package loading.',
+            extra={
+                'package': package.name,
+            },
+        )
+
+        load.load_package(package)
 
         return
 
