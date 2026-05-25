@@ -1,6 +1,7 @@
 # dpetl — Data package ETL
 
 [![Release](https://img.shields.io/pypi/v/dpetl.svg)](https://pypi.python.org/pypi/dpetl)
+![Coverage](coverage.svg)
 
 The `dpetl` is a command-line interface (CLI) tool designed to run the three ETL phases (Extract, Transform, Load)[^1]
 
@@ -38,10 +39,13 @@ Currently, only the `extract` command is available:
 dpetl extract
 
 # Specify a descriptor explicitly
-dpetl extract -d path/to/datapackage.yaml
+dpetl -d path/to/datapackage.yaml extract
 # or
-dpetl extract --descriptor path/to/datapackage.yaml
+dpetl --descriptor path/to/datapackage.yaml extract
 ```
+
+The `--descriptor/-d` option is global and should be placed before the any ETL
+command.
 
 ## How It Works
 
