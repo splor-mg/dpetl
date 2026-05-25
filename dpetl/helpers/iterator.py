@@ -1,11 +1,12 @@
 import logging
 import tomllib
-
 from frictionless import Package
 
 from dpetl.extract import api, email
+from dpetl.transform import transform
 
 logger = logging.getLogger(__name__)
+
 
 def descriptor_iteration(**kwargs):
     """
@@ -14,7 +15,7 @@ def descriptor_iteration(**kwargs):
     descriptor = kwargs.get('descriptor')
     descriptor_suffix = descriptor.split('.')[-1]
     if descriptor_suffix == 'toml':
-        with open(descriptor, "rb") as f:
+        with open(descriptor, 'rb') as f:
             descriptors = tomllib.load(f)
 
         for descriptor in descriptors['datapackages'].values():
@@ -33,35 +34,57 @@ def descriptor_iteration(**kwargs):
             return
         resources_iteration(package, **kwargs)
 
+
 def resources_iteration(package, **kwargs):
     """
     Iterate on resources from a package descriptor or a package object
     and apply a function to each resource.
     """
+    operation = kwargs.get('operation')
 
     # TODO: Support all three ETL operations
-    for resource in package.resources:
-        mode = resource.custom.get('dpetl_extract', {}).get('mode')
 
-        if not mode:
-            logger.error(
-                ('Missing required dpetl_extract.mode custom property'
-                'at the resource level.'),
+    if operation == 'extract':
+        for resource in package.resources:
+            mode = resource.custom.get('dpetl_extract', {}).get('mode')
+
+            if not mode:
+                logger.error(
+                    ('Missing required dpetl_extract.mode custom property'
+                    'at the resource level.'),
+                    extra={
+                        'resource': resource.name,
+                    },
+                )
+                return
+
+            logger.info(
+                'Starting resource extraction.',
                 extra={
                     'resource': resource.name,
+                    'mode': mode,
                 },
             )
-            return
+
+            if mode == 'email':
+                email.email_connection(resource, **kwargs)
+            elif mode == 'api':
+                api.check_multipart_files(resource, **kwargs)
+
+        return
+
+    # Transform
+    if operation == 'transform':
 
         logger.info(
-            'Starting resource extraction.',
+            'Starting package transformation.',
             extra={
-                'resource': resource.name,
-                'mode': mode,
+                'package': package.name,
             },
         )
 
-        if mode == 'email':
-            email.email_connection(resource, **kwargs)
-        elif mode == 'api':
-            api.check_multipart_files(resource, **kwargs)
+        transform.transform_resource(package)
+
+        return
+
+    raise ValueError(f'Unsupported operation: {operation}')

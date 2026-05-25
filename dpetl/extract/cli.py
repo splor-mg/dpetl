@@ -28,4 +28,4 @@ def create_extract_subcommands(subparsers):
 
 def handle_command(args):
 
-    descriptor_iteration(**vars(args))
+    descriptor_iteration(operation='extract', **vars(args))
