@@ -38,10 +38,13 @@ Currently, only the `extract` command is available:
 dpetl extract
 
 # Specify a descriptor explicitly
-dpetl extract -d path/to/datapackage.yaml
+dpetl -d path/to/datapackage.yaml extract
 # or
-dpetl extract --descriptor path/to/datapackage.yaml
+dpetl --descriptor path/to/datapackage.yaml extract
 ```
+
+The `--descriptor/-d` option is global and should be placed before the any ETL
+command.
 
 ## How It Works
 
