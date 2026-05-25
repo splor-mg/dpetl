@@ -41,7 +41,9 @@ dev = [
     'ipdb (>=0.13.13,<0.14.0)',
     'pytest (>=9.0.2,<10.0.0)',
     'pytest-cov (>=7.0.0,<8.0.0)',
-    'ruff (>=0.14.10,<0.15.0)'
+    'ruff (>=0.14.10,<0.15.0)',
+    "coverage-badge (>=1.1.2,<2.0.0)",
+    "setuptools (<81)"
 ]
 
 [project.scripts]
@@ -74,6 +76,7 @@ format = { cmd = 'ruff format', help = 'Formats code according to code style con
 test = { cmd = 'pytest -vv --cov=dpetl --cov-report=term-missing --cov-report=xml', help = 'Runs unit tests with coverage.' }
 test_debug = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests in debug mode.' }
 coverage_html = { cmd = 'coverage html', help = 'Generates an HTML coverage report.' }
+coverage_badge = { cmd = 'coverage-badge -o coverage.svg -f', help = 'Generates the README coverage badge.' }
 check = { cmd = 'task lint && task test', help = 'Runs lint and tests.' }
 bump = { cmd = 'cz bump', help = 'Bumps project version.' }
 publish = { cmd = 'task bump && dotenv run poetry publish --build -n && git push origin main --tags', help = 'Bumps version and publish the package on Pypi.' }
