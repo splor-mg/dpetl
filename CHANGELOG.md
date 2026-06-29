@@ -1,3 +1,26 @@
+## 0.9.0 (2026-06-29)
+
+### Feat
+
+- **actions**: add test and test_coverage actions
+- **README.md**: add coverage badge to README
+- **load**: add initial structure
+- **load**: add load operation
+- **load**: add load subcommands to CLI
+- **transform**: add transform subcommands to CLI
+- **transform**: add initial structure
+- **transform**: add transform operation
+- **extract**: add operation argument
+
+### Refactor
+
+- **pyproject**: review rre and post test tasks
+- **load**: use descriptor parameters for repository configuration
+- **load**: improve GitHub integration and repository configuration
+- **load**: remove CLI arguments
+- **transform**: reorganize transform code
+- **transform**: use dpetl_transform for configurable output
+
 ## 0.8.2 (2026-04-23)
 
 ### Fix
