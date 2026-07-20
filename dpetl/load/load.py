@@ -40,7 +40,7 @@ def load_package(package, **kwargs):
         logger.error('Field "visibility" in "dpetl_load" must be "public" or "private".')
         raise SystemExit(1)
 
-    logger.info(f'Processing {repo or 'local commit'}.')
+    logger.info(f'Processing {repo or "local commit"}.')
 
     # Ensure remote repository exists
     if repo and not github.repo_exists(owner, repo, token):
