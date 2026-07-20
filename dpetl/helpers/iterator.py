@@ -1,8 +1,8 @@
 import logging
-import tomllib
+from pathlib import Path
 from frictionless import Package
 
-from dpetl.extract import api, email
+from dpetl.extract import extract
 from dpetl.transform import transform
 from dpetl.load import load
 
@@ -13,26 +13,24 @@ def descriptor_iteration(**kwargs):
     """
     Iterate on package(s) descriptor(s) and apply a function to each package.
     """
-    descriptor = kwargs.get('descriptor')
-    descriptor_suffix = descriptor.split('.')[-1]
-    if descriptor_suffix == 'toml':
-        with open(descriptor, 'rb') as f:
-            descriptors = tomllib.load(f)
+    default = ('datapackage.json' if kwargs.get('operation') == 'load'
+               else 'datapackage.yaml')
 
-        for descriptor in descriptors['datapackages'].values():
-            package = Package(descriptor['path'])
-            resources_iteration(package, **kwargs)
+    if kwargs.get('descriptor'):
+        descriptors = [Path(descriptor) for descriptor in kwargs.get('descriptor')]
 
-    elif descriptor_suffix in ['yaml', 'yml', 'json']:
+    elif Path(default).exists():
+        descriptors = [Path(default)]
+
+    elif Path('datapackages').is_dir():
+        descriptors = Path('datapackages').glob(f'*/{default}')
+
+    else:
+        logger.error('No descriptor found.')
+        return
+
+    for descriptor in descriptors:
         package = Package(descriptor)
-        if not package:
-            logger.error(
-                'Descriptor does not create a valid package.',
-                extra={
-                    'package': package.name,
-                },
-            )
-            return
         resources_iteration(package, **kwargs)
 
 
@@ -45,36 +43,19 @@ def resources_iteration(package, **kwargs):
 
     # Extract
     if operation == 'extract':
-        for resource in package.resources:
-            mode = resource.custom.get('dpetl_extract', {}).get('mode')
 
-            if not mode:
-                logger.error(
-                    ('Missing required dpetl_extract.mode custom property'
-                    'at the resource level.'),
-                    extra={
-                        'resource': resource.name,
-                    },
-                )
-                return
+        logger.info(
+            'Starting package extraction.',
+            extra={
+                'package': package.name,
+            },
+        )
 
-            logger.info(
-                'Starting resource extraction.',
-                extra={
-                    'resource': resource.name,
-                    'mode': mode,
-                },
-            )
-
-            if mode == 'email':
-                email.email_connection(resource, **kwargs)
-            elif mode == 'api':
-                api.check_multipart_files(resource, **kwargs)
-
+        extract.extract_package(package, **kwargs)
         return
 
     # Transform
-    if operation == 'transform':
+    elif operation == 'transform':
 
         logger.info(
             'Starting package transformation.',
@@ -83,11 +64,10 @@ def resources_iteration(package, **kwargs):
             },
         )
 
-        transform.transform_resource(package)
-
+        transform.transform_package(package, **kwargs)
         return
 
-    #Load
+    # Load
     if operation == 'load':
 
         logger.info(
@@ -97,8 +77,7 @@ def resources_iteration(package, **kwargs):
             },
         )
 
-        load.load_package(package)
-
+        load.load_package(package, **kwargs)
         return
 
     raise ValueError(f'Unsupported operation: {operation}')
