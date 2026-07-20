@@ -1,17 +1,10 @@
-from dpetl.helpers.iterator import descriptor_iteration
+import typer
+
+from dpetl.helpers import iterator
 
 
-def create_transform_subcommands(subparsers):
-
-    parser = subparsers.add_parser(
-        'transform', help='Simplified some ETL transform operations.'
-    )
-
-    parser.set_defaults(func=handle_command)
-
-    return parser
-
-
-def handle_command(args):
-
-    descriptor_iteration(operation='transform', **vars(args))
+def transform(ctx: typer.Context):
+    """
+    Simplified some ETL transform operations.
+    """
+    iterator.descriptor_iteration(operation='transform', **ctx.obj)
