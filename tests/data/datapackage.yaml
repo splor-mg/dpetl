@@ -1,0 +1,67 @@
+name: test_package
+title: Pacote de testes para dpetl
+resources:
+  - name: acao
+    type: table
+    path: data_raw/acao_previous.csv
+    scheme: multipart
+    format: csv
+    mediatype: text/csv
+    extrapaths:
+      - data_raw/acao_current.csv
+    encoding: utf-8
+    schema:
+      fields:
+        - name: Ano de Exercício
+          type: string
+          target: ano
+        - name: Projeto_Atividade - Código
+          type: string
+          target: acao_cod
+        - name: Projeto_Atividade - Descrição
+          type: string
+          target: acao_desc
+    dpetl_extract:
+      mode: email
+      mailbox: '[Gmail]/Trash'
+      criteria:
+        subject: acao
+    dpetl_transform:
+      format: csv
+
+  - name: api_resource
+    type: table
+    path: data_raw/api_data.csv
+    format: csv
+    schema:
+      fields:
+        - name: id
+          type: string
+        - name: value
+          type: string
+    dpetl_extract:
+      mode: api
+      sources:
+        - method: GET
+          path: https://api.example.com/data
+          headers:
+            Authorization: Bearer token
+    dpetl_transform:
+      format: csv
+
+  - name: static_resource
+    type: table
+    path: data_raw/static.csv
+    format: csv
+    schema:
+      fields:
+        - name: col1
+          type: string
+          target: nova_col1
+    dpetl_transform:
+      format: csv
+      path: data/processed
+
+dpetl_load:
+  owner: test_owner
+  repo: test_repo
