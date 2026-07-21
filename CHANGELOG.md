@@ -1,3 +1,24 @@
+## 0.10.0 (2026-07-21)
+
+### Feat
+
+- **extract**: add extraction module with validation
+- **transform**: always export descriptor as JSON and add datapackage validation
+- **load**: skip empty commits and add datapackage validation
+- **transform**: add datapackage validation
+
+### Fix
+
+- **load**: fix f-string syntax error on line 43
+- **email**: avoid setting date_gte to None when not filtering by today
+- **api**: handle uppercase HTTP method in sources
+
+### Refactor
+
+- **validate**: move validation logic to helpers for reuse across phases
+- **iterator**: remove toml support and simplify descriptor discovery
+- **cli**: migrate from argparse to typer
+
 ## 0.9.0 (2026-06-29)
 
 ### Feat
