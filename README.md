@@ -266,6 +266,8 @@ Flags that can be used with any command:
 | `--no-validate`, `-nv` | Skip datapackage validation |
 | `--no-stop`, `-ns` | Continue even if validation fails (do not exit with error) |
 | `--validate-before`, `-vb` | Run validation before processing (not supported for `extract`) |
+| `--verbose` | Enable debug logging (also writes logs to `dpetl.debug.log`) |
+| `--quiet`, `-q` | Suppress all logs except warnings and errors |
 | `--version`, `-v` | Show version number and exit |
 | `--help` | Show help message |
 
