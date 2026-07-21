@@ -11,7 +11,6 @@ def repo_exists(owner, repo, token):
     """
     Check if a GitHub repository exists for a given owner.
     """
-
     url = f'https://api.github.com/repos/{owner}/{repo}'
     r = requests.get(url, headers={'Authorization': f'token {token}'})
     return r.status_code == 200
@@ -21,7 +20,6 @@ def create_repo(owner, repo, token, level, visibility):
     """
     Create a new GitHub repository under a user or organization.
     """
-
     # Select correct endpoint: user or organization
     if level == 'orgs':
         url = f'https://api.github.com/orgs/{owner}/repos'
@@ -48,7 +46,6 @@ def commit_remote(owner, repo, token, files):
     """
     Create a single commit with multiple files using the GitHub Git Data API.
     """
-
     # Base repository API URL and headers
     url = f'https://api.github.com/repos/{owner}/{repo}'
 
@@ -92,28 +89,32 @@ def commit_remote(owner, repo, token, files):
             'sha': blob['sha']
         })
 
-    # Build updated file tree
-    tree = requests.post(
-        f'{url}/git/trees',
-        headers=headers,
-        json={
-            'base_tree': base_tree,
-            'tree': items
-        }
-    ).json()
+        # Build updated file tree
+        tree = requests.post(
+            f'{url}/git/trees',
+            headers=headers,
+            json={
+                'base_tree': base_tree,
+                'tree': items
+            }
+        ).json()
 
-    # Create commit with timestamp
-    timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        if tree['sha'] == base_tree:
+            logger.info('No changes to commit.')
+            return
 
-    new_commit = requests.post(
-        f'{url}/git/commits',
-        headers=headers,
-        json={
-            'message': f'update data package at: {timestamp}',
-            'tree': tree['sha'],
-            'parents': [sha]
-        }
-    ).json()
+        # Create commit with timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+
+        new_commit = requests.post(
+            f'{url}/git/commits',
+            headers=headers,
+            json={
+                'message': f'update data package at: {timestamp}',
+                'tree': tree['sha'],
+                'parents': [sha]
+            }
+        ).json()
 
     # Update branch to new commit
     requests.patch(
@@ -127,7 +128,6 @@ def commit_local(files):
     """
     Commit and push local repository changes.
     """
-
     subprocess.run(['git', 'add', '-f', *files.keys()], check=True)
 
     changes = subprocess.run(['git', 'diff', '--cached', '--quiet'])

@@ -1,36 +1,77 @@
-import argparse
+import typer
+from typing import Annotated, Optional
+from importlib.metadata import version
 
-from .extract.cli import create_extract_subcommands
-from .transform.cli import create_transform_subcommands
-from .load.cli import create_load_subcommands
-
-def build_parser():
-    parser = argparse.ArgumentParser(
-        prog='etl',
-        description='ETL Command Line Interface',
-    )
-
-    parser.add_argument(
-        '--descriptor',
-        '-d',
-        default='datapackage.yaml',
-        help='Path to a datapackage.yaml file (default: datapackage.yaml).',
-    )
-
-    subparsers = parser.add_subparsers(
-        title='commands',
-        dest='command',
-        required=True,
-    )
-
-    create_extract_subcommands(subparsers)
-    create_transform_subcommands(subparsers)
-    create_load_subcommands(subparsers)
-
-    return parser
+from .extract.cli import extract
+from .transform.cli import transform
+from .load.cli import load
 
 
-def main():
-    parser = build_parser()
-    args = parser.parse_args()
-    args.func(args)
+app = typer.Typer(name='etl', help='ETL Command Line Interface',
+                  pretty_exceptions_show_locals=False)
+
+app.command()(extract)
+app.command()(transform)
+app.command()(load)
+
+def version_callback(value: bool):
+    if value:
+        typer.echo(f"dpetl {version('dpetl')}")
+        raise typer.Exit()
+
+@app.callback()
+def main(
+    ctx: typer.Context,
+
+    descriptor: Annotated[
+        Optional[list[str]],
+        typer.Option('--descriptor', '-d',
+                     help='Path to datapackage descriptor.',
+                     show_default='datapackage.yaml (extract/transform) '
+                                  '/ datapackage.json (load) '
+                                  'or datapackages/*/'
+)
+    ] = None,
+
+    no_validate: Annotated[
+        bool,
+        typer.Option('--no-validate', '-nv',
+                     help='Skip datapackage validation.'),
+    ] = False,
+
+    no_stop: Annotated[
+        bool,
+        typer.Option('--no-stop', '-ns',
+                     help='Do not stop the process if validation fails.'),
+    ] = False,
+
+    validate_before: Annotated[
+        bool,
+        typer.Option('--validate-before', '-vb',
+                     help='Validate datapackage before processing.'),
+    ] = False,
+
+    version: Annotated[
+        bool,
+        typer.Option('--version', '-v',
+                     callback=version_callback, is_eager=True,
+                     help='Show the application version and exit.'),
+    ] = False,
+):
+
+    if validate_before and no_validate:
+        raise typer.BadParameter(
+            "'--validate-before' cannot be used together with '--no-validate'."
+        )
+
+    if validate_before and ctx.invoked_subcommand == 'extract':
+        raise typer.BadParameter(
+             "'--validate-before' is not supported for the 'extract' command."
+        )
+
+    ctx.obj = {
+        'descriptor': descriptor,
+        'no_validate': no_validate,
+        'no_stop': no_stop,
+        'validate_before': validate_before,
+    }

@@ -47,7 +47,7 @@ dev = [
 ]
 
 [project.scripts]
-dpetl = 'dpetl.cli:main'
+dpetl = 'dpetl.cli:app'
 
 [tool.poetry]
 packages = [{ include = 'dpetl' }]

@@ -23,7 +23,7 @@ def extract_api(resource, **kwargs):
     try:
         source = resource.sources[0]
         if source:
-            func = getattr(requests, source['method'])
+            func = getattr(requests, source['method'].lower())
             response = func(
                 source['path'],
                 timeout=source.get('timeout', 30),
