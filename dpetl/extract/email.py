@@ -17,7 +17,6 @@ def email_connection(resource, **kwargs):
     Connect to an e-mail server, search for the most recent e-mail matching
     the given criteria and save its attachments to the resource path.
     """
-
     # Get resource defained criteria for e-mail search
     dptel_extract = resource.custom.get('dpetl_extract', {})
     dptel_extract.setdefault('criteria', {})
@@ -92,8 +91,8 @@ def extract_email(mailbox, resource, **kwargs):
         elif not subject and add_package_name:
             criteria['subject'] = f'{package_name}_{name}'
 
-        today = datetime.date.today()
-        criteria['date_gte'] = today if kwargs.get('today_email') else None
+        if kwargs.get('today_email'):
+            criteria['date_gte'] = datetime.date.today()
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         search_query = AND(**criteria)
         logger.debug(
