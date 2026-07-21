@@ -103,3 +103,67 @@ def test_extract_integration(tmp_path):
     # Run the extract command
     result = runner.invoke(app, ['extract'], obj={'no_validate': True, 'no_stop': True})
     assert result.exit_code == 0
+
+
+# Logging flags test -----------------------------------------------------------
+def test_verbose_and_quiet_conflict():
+    """Test that --verbose and --quiet cannot be used together."""
+    result = runner.invoke(app, ['--verbose', '--quiet', 'extract'])
+    assert result.exit_code == 2
+    assert "cannot be used together" in result.output
+
+
+def test_verbose_creates_log_file(tmp_path, monkeypatch):
+    """Test that --verbose creates a debug log file."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ['--verbose', 'extract'], obj={'no_validate': True, 'no_stop': True})
+    assert (tmp_path / 'dpetl.debug.log').exists()
+
+
+def test_quiet_does_not_create_log_file(tmp_path, monkeypatch):
+    """Test that --quiet does not create a debug log file."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ['--help', '--quiet'])
+    assert result.exit_code == 0
+    assert not (tmp_path / 'dpetl.debug.log').exists()
+
+
+def test_verbose_sets_debug_level(monkeypatch, tmp_path):
+    """Test that --verbose sets logging level to DEBUG."""
+    import logging
+    from dpetl.cli import setup_logging
+
+    monkeypatch.chdir(tmp_path)
+
+    logging.getLogger().handlers.clear()
+    logging.getLogger().setLevel(logging.NOTSET)
+
+    setup_logging(verbose=True, quiet=False)
+
+    assert logging.getLogger().level == logging.DEBUG
+
+
+def test_default_logging_level(monkeypatch, tmp_path):
+    """Test that default logging level is INFO."""
+    import logging
+    from dpetl.cli import setup_logging
+
+    monkeypatch.chdir(tmp_path)
+    logging.getLogger().handlers.clear()
+    logging.getLogger().setLevel(logging.NOTSET)
+
+    setup_logging(verbose=False, quiet=False)
+    assert logging.getLogger().level == logging.INFO
+
+
+def test_quiet_sets_warning_level(monkeypatch, tmp_path):
+    """Test that --quiet sets logging level to WARNING."""
+    import logging
+    from dpetl.cli import setup_logging
+
+    monkeypatch.chdir(tmp_path)
+    logging.getLogger().handlers.clear()
+    logging.getLogger().setLevel(logging.NOTSET)
+
+    setup_logging(verbose=False, quiet=True)
+    assert logging.getLogger().level == logging.WARNING

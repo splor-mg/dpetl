@@ -4,7 +4,7 @@ import petl as etl
 from dpetl.transform import datapackage
 from dpetl.helpers import validate
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('dpetl.transform')
 
 
 def transform_package(package, **kwargs):
@@ -18,6 +18,11 @@ def transform_package(package, **kwargs):
     errors = []
 
     for resource in package.resources:
+
+        logger.debug(
+            'Transforming resource %s.',
+            resource.name,
+        )
 
         # Define output settings
         dpetl = resource.custom.get('dpetl_transform', {})

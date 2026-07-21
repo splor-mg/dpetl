@@ -207,14 +207,21 @@ def test_commit_local(monkeypatch, files, has_changes, expected_commands):
     """Test commit_local with and without changes."""
     commands = []
 
-    def mock_run(cmd, check=False, capture_output=False):
+    def mock_run(cmd, check=False, capture_output=False, **kwargs):
         commands.append(cmd)
         ret = SimpleNamespace(returncode=0)
         if cmd == ['git', 'diff', '--cached', '--quiet']:
             ret.returncode = 0 if not has_changes else 1
         return ret
 
+    def mock_check_output(cmd, **kwargs):
+        # Simulate git rev-parse --short HEAD
+        if cmd == ['git', 'rev-parse', '--short', 'HEAD']:
+            return 'abc1234\n'
+        return b''
+
     monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr(subprocess, 'check_output', mock_check_output)
 
     github.commit_local(files)
 

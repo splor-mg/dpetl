@@ -37,11 +37,12 @@ def email_connection(resource, **kwargs):
 
     configure_proxy_from_env()
     with MailBox(email_imap).login(email_user, email_pwd) as mailbox:
-        logger.info('Connected to e-mail successfully.')
+        logger.debug('Connected to e-mail successfully.')
 
         mailbox.folder.set(email_box)
-        logger.info(
-            'E-mail folder selected.', extra={'folder': email_box}
+        logger.debug(
+            'Selected e-mail folder %s.',
+            email_box
         )
 
         extract_email(mailbox, resource, **kwargs)
@@ -68,10 +69,9 @@ def extract_email(mailbox, resource, **kwargs):
 
         if len(resource.extrapaths) > 0:
             logger.debug(
-                'Using defined pattern as subject could not be defined in multipart file resources.',
-                extra={'criteria': str(criteria),
-                       'resource': resource.name,
-                       },
+                'Subject was automatically generated for multipart resource %s. criteria=%s.',
+                resource.name,
+                criteria
             )
             criteria['subject'] = f'{package_name}_{name}' if add_package_name else name
         # If subject is already defined in the resource criteria, the flag
@@ -81,10 +81,9 @@ def extract_email(mailbox, resource, **kwargs):
         # to search for and adding the package name would change this pattern.
         elif subject and add_package_name:
             logger.debug(
-                'Flag --add-package-name no applied as subject is defined in this resource.',
-                extra={'criteria': str(criteria),
-                       'resource': resource.name,
-                       },
+                'Flag --add-package-name not applied because a subject is defined for resource %s. criteria=%s.',
+                resource.name,
+                criteria
             )
         elif not subject and not add_package_name:
             criteria['subject'] = name
@@ -96,55 +95,52 @@ def extract_email(mailbox, resource, **kwargs):
         resource_path.parent.mkdir(parents=True, exist_ok=True)
         search_query = AND(**criteria)
         logger.debug(
-            'Searching for e-mails.', extra={'criteria': str(criteria)}
+            'Searching for e-mails matching criteria %s.',
+            criteria
         )
 
         msgs = list(mailbox.fetch(search_query, limit=1, reverse=True))
 
         if not msgs:
             logger.warning(
-                'No e-mail found matching the criteria.',
-                extra={'criteria': str(criteria)},
+                'No e-mail found matching criteria %s.',
+                criteria
             )
             return
         elif len(msgs) > 1:
             # No neet to stop the code, just inform
             logger.warning(
-                'More than one e-mail was found matching the criteria.',
-                extra={'criteria': str(criteria)},
+                'More than one e-mail found matching criteria %s.',
+                criteria
             )
 
         msg = msgs[0]
 
-        logger.info(
-            'E-mail found.',
-            extra={
-                'subject': msg.subject,
-                'date': str(msg.date),
-                'from': msg.from_,
-            },
+        logger.debug(
+            'Found e-mail "%s" from %s (%s).',
+            msg.subject,
+            msg.from_,
+            msg.date
         )
 
         if not msg.attachments:
             logger.warning(
-                'E-mail found but no attachments presented.',
-                extra={'subject': msg.subject},
+                'Found e-mail "%s" with no attachments.',
+                msg.subject
             )
             return
         elif len(msg.attachments) > 1:
             # No neet to stop the code, just inform
             logger.warning(
-                'More than one attachment file found.',
-                extra={'criteria': str(criteria)},
+                'Found multiple attachments in e-mail matching criteria %s.',
+                criteria
             )
 
         for index, att in enumerate(msg.attachments):
             logger.debug(
-                'Processing attachment.',
-                extra={
-                    'filename': att.filename,
-                    'size_bytes': len(att.payload),
-                },
+                'Processing attachment %s (%d bytes).',
+                att.filename,
+                len(att.payload)
             )
 
             path = (
@@ -159,14 +155,12 @@ def extract_email(mailbox, resource, **kwargs):
                 f.write(att.payload)
 
             logger.info(
-                'Attachment saved successfully.',
-                extra={
-                    'filename': att.filename,
-                    'saved_to': str(path),
-                },
+                'Saved attachment %s to %s.',
+                att.filename,
+                path
             )
 
-        logger.info('E-mail extraction completed successfully.')
+        logger.debug('E-mail extraction completed successfully.')
 
     except Exception:
         logger.exception('Unexpected error during e-mail extraction.')

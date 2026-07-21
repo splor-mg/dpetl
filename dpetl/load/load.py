@@ -6,7 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 from dpetl.load import github
 from dpetl.helpers import validate
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('dpetl.load')
 
 
 def load_package(package, **kwargs):
@@ -40,11 +40,10 @@ def load_package(package, **kwargs):
         logger.error('Field "visibility" in "dpetl_load" must be "public" or "private".')
         raise SystemExit(1)
 
-    logger.info(f'Processing {repo or "local commit"}.')
+    logger.debug(f'Processing {repo or "local commit"}.')
 
     # Ensure remote repository exists
     if repo and not github.repo_exists(owner, repo, token):
-        logger.info(f'Creating repository {repo}.')
         github.create_repo(owner, repo, token, level, visibility)
 
     # Prepare files to send
@@ -61,7 +60,7 @@ def load_package(package, **kwargs):
     validate.validate_datapackage(package, **kwargs)
 
     # Commit all files in a single commit
-    logger.info('Committing data package.')
+    logger.debug('Committing data package.')
 
     if repo:
         github.commit_remote(owner, repo, token, files)
