@@ -1,6 +1,6 @@
 import logging
 
-from dpetl.extract import api, email
+from dpetl.extract import api, command, email
 from dpetl.helpers import validate
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,9 @@ def extract_package(package, **kwargs):
             email.email_connection(resource, **kwargs)
         elif mode == 'api':
             api.check_multipart_files(resource, **kwargs)
-
+        elif mode == 'cli':
+            command.check_cli_commands(resource, **kwargs)
+            
         # Check if the extracted data is valid
         if not validate.check_resource(resource, rows, errors, **kwargs):
             break

@@ -85,22 +85,6 @@ dpetl extract --add-package-name
 
 Each resource in the descriptor must declare an extraction `mode` (`email` or `api`) inside its `dpetl_extract` property (see [Example Data Package Configuration](#example-data-package-configuration)). If a resource is missing this property, the whole package extraction stops immediately.
 
-### Email Extractor
-
-Connects to your IMAP server using environment variables (`EMAIL_USER`, `EMAIL_PWD`, `EMAIL_IMAP`), applying proxy settings (`HTTP_PROXY`/`HTTPS_PROXY`) if set.
-
-It then searches for the **most recent** e-mail matching `criteria`:
-
-- `subject`: if you don't set it in the datapackage (`criteria.subject`), it defaults to the resource name (or `{package_name}_{resource_name}` with `--add-package-name`).
-
-- `date_gte`: if you don't set it in the datapackage (`criteria.date_gte`), it defaults to the most recent e-mail (no date filter). Passing `--today-email` sets it to today's date.
-
-- any other filter supported by [imap-tools](https://pypi.org/project/imap-tools/#user-content--email-attributes) (sender, folder, etc.) can also be set.
-
-Once a matching e-mail is found, its first attachment is saved to `resource.path`. If there is more than one attachment, the extra ones are saved next to it, named `{name}_1{ext}`, `{name}_2{ext}`, and so on.
-
-If the resource declares `extrapaths` (multiple files for the same resource), the same search-and-save logic runs once per path.
-
 ### API Extractor
 
 Reads the request settings from the resource's `sources` property:
@@ -118,6 +102,32 @@ Reads the request settings from the resource's `sources` property:
 Once the URL is built, dpetl makes the request and saves the response to `resource.path`.
 
 If the resource declares `extrapaths` (multiple files for the same resource), the same steps run once per path, reusing the same base URL.
+
+### CLI Extractor
+
+Executes local command-line commands to generate or fetch data for the resource.
+
+Configure with `mode: cli` and a list of `arguments` under `dpetl_extract`:
+
+- `arguments`: required. A list of shell commands to run sequentially.
+
+Each command is executed in order. If a command fails, the error is logged and execution continues with the next command.
+
+### Email Extractor
+
+Connects to your IMAP server using environment variables (`EMAIL_USER`, `EMAIL_PWD`, `EMAIL_IMAP`), applying proxy settings (`HTTP_PROXY`/`HTTPS_PROXY`) if set.
+
+It then searches for the **most recent** e-mail matching `criteria`:
+
+- `subject`: if you don't set it in the datapackage (`criteria.subject`), it defaults to the resource name (or `{package_name}_{resource_name}` with `--add-package-name`).
+
+- `date_gte`: if you don't set it in the datapackage (`criteria.date_gte`), it defaults to the most recent e-mail (no date filter). Passing `--today-email` sets it to today's date.
+
+- any other filter supported by [imap-tools](https://pypi.org/project/imap-tools/#user-content--email-attributes) (sender, folder, etc.) can also be set.
+
+Once a matching e-mail is found, its first attachment is saved to `resource.path`. If there is more than one attachment, the extra ones are saved next to it, named `{name}_1{ext}`, `{name}_2{ext}`, and so on.
+
+If the resource declares `extrapaths` (multiple files for the same resource), the same search-and-save logic runs once per path.
 
 
 ## `transform`
@@ -208,7 +218,16 @@ resources:
         from_: "finance@example.com"   # optional
         date_gte: 2024-01-01   # optional (See also the flag --today-email)
 
-  # Example 3: Static resource with column renaming
+  # Example 3: CLI extraction
+  - name: external_data
+    path: data/external_data.csv
+    dpetl_extract:
+      mode: cli
+      arguments:   # required. List of shell commands to run sequentially
+        - curl -o data/external_data.csv https://api.example.com/export
+        - python scripts/clean_data.py data/external_data.csv
+
+  # Example 4: Static resource with column renaming
   - name: employees
     path: data/employees.csv
     schema:
