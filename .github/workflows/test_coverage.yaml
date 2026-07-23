@@ -33,6 +33,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Set up python
         id: setup-python
         uses: actions/setup-python@v5
@@ -63,6 +68,7 @@ jobs:
           poetry run task coverage_badge
 
       - name: Publish coverage badge
+        if: github.ref == 'refs/heads/main'
         run: |
           git add coverage.svg
           git commit -m "Create/Update coverage badge main branch" || true
