@@ -40,15 +40,14 @@ def resources_iteration(package, **kwargs):
     and apply a function to each resource.
     """
     operation = kwargs.get('operation')
+    logger = logging.getLogger(f'dpetl.{operation}')
 
     # Extract
     if operation == 'extract':
 
         logger.info(
-            'Starting package extraction.',
-            extra={
-                'package': package.name,
-            },
+            'Extracting package %s.',
+            package.name
         )
 
         extract.extract_package(package, **kwargs)
@@ -58,10 +57,8 @@ def resources_iteration(package, **kwargs):
     elif operation == 'transform':
 
         logger.info(
-            'Starting package transformation.',
-            extra={
-                'package': package.name,
-            },
+            'Transforming package %s.',
+            package.name
         )
 
         transform.transform_package(package, **kwargs)
@@ -71,10 +68,8 @@ def resources_iteration(package, **kwargs):
     if operation == 'load':
 
         logger.info(
-            'Starting package loading.',
-            extra={
-                'package': package.name,
-            },
+            'Loading package %s.',
+            package.name
         )
 
         load.load_package(package, **kwargs)

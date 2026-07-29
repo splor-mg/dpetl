@@ -1,3 +1,4 @@
+import logging
 import typer
 from typing import Annotated, Optional
 from importlib.metadata import version
@@ -14,10 +15,33 @@ app.command()(extract)
 app.command()(transform)
 app.command()(load)
 
+
+def setup_logging(verbose: bool, quiet: bool):
+    if quiet:
+        level = logging.WARNING
+    elif verbose:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+
+    handlers = [logging.StreamHandler()]
+
+    if verbose:
+        handlers.append(logging.FileHandler('dpetl.debug.log', encoding='utf-8'))
+
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s %(levelname)-5.5s [%(name)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=handlers,
+    )
+
+
 def version_callback(value: bool):
     if value:
         typer.echo(f"dpetl {version('dpetl')}")
         raise typer.Exit()
+
 
 @app.callback()
 def main(
@@ -51,6 +75,19 @@ def main(
                      help='Validate datapackage before processing.'),
     ] = False,
 
+
+    verbose: Annotated[
+        bool,
+        typer.Option('--verbose',
+                     help='Enable debug logging.'),
+    ] = False,
+
+    quiet: Annotated[
+        bool,
+        typer.Option('--quiet', '-q',
+                     help='Show only warnings and errors.'),
+    ] = False,
+
     version: Annotated[
         bool,
         typer.Option('--version', '-v',
@@ -58,6 +95,12 @@ def main(
                      help='Show the application version and exit.'),
     ] = False,
 ):
+    setup_logging(verbose, quiet)
+
+    if verbose and quiet:
+        raise typer.BadParameter(
+            "'--verbose' cannot be used together with '--quiet'."
+        )
 
     if validate_before and no_validate:
         raise typer.BadParameter(

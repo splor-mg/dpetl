@@ -20,6 +20,8 @@ def create_repo(owner, repo, token, level, visibility):
     """
     Create a new GitHub repository under a user or organization.
     """
+    logger.info(f'Creating repository {repo}.')
+    
     # Select correct endpoint: user or organization
     if level == 'orgs':
         url = f'https://api.github.com/orgs/{owner}/repos'
@@ -123,6 +125,15 @@ def commit_remote(owner, repo, token, files):
         json={'sha': new_commit['sha']}
     )
 
+    logger.info(
+        'Successfully committed %d files to %s/%s. Commit=%s Files=[%s]',
+        len(files),
+        owner,
+        repo,
+        new_commit['sha'][:7],
+        ', '.join(files.keys())
+    )
+
 
 def commit_local(files):
     """
@@ -140,3 +151,14 @@ def commit_local(files):
     subprocess.run(['git', 'commit', '-m', f'update data package at: {timestamp}'], check=True)
 
     subprocess.run(['git', 'push'], check=True)
+
+    commit_sha = subprocess.check_output(
+        ['git', 'rev-parse', '--short', 'HEAD'],
+        text=True
+    ).strip()
+
+    logger.info(
+        'Successfully committed and pushed changes. Commit=%s Files=[%s]',
+        commit_sha,
+        ', '.join(files.keys())
+    )

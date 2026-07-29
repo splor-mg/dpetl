@@ -19,20 +19,15 @@ def extract_package(package, **kwargs):
 
         if not mode:
             logger.error(
-                'Missing required dpetl_extract.mode custom property '
-                'at the resource level.',
-                extra={
-                    'resource': resource.name,
-                },
+                'Missing required dpetl_extract.mode custom property for resource %s',
+                resource.name
             )
             return
 
-        logger.info(
-            'Starting resource extraction.',
-            extra={
-                'resource': resource.name,
-                'mode': mode,
-            },
+        logger.debug(
+            'Extracting resource %s using mode %s.',
+            resource.name,
+            mode
         )
 
         # Run the extraction based on the configured mode
