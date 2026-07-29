@@ -3,8 +3,9 @@ Integration tests for extraction module: email and API sources.
 """
 import pytest
 import requests
+import subprocess
 
-from dpetl.extract import api, email, extract
+from dpetl.extract import api, command, email, extract
 
 
 # Helper: Mock for IMAP MailBox ------------------------------------------------
@@ -81,6 +82,29 @@ def test_extract_package_api_mode(monkeypatch):
     extract.extract_package(FakePackage(), no_stop=True, no_validate=True)
 
     assert calls == [('api', 'test_resource')]
+
+
+def test_extract_package_cli_mode(monkeypatch):
+    """Verify that extract_package calls check_cli_commands when mode is 'cli'."""
+    calls = []
+
+    def fake_cli_command(resource, **kwargs):
+        calls.append(('cli', resource.name))
+
+    monkeypatch.setattr('dpetl.extract.command.check_cli_commands', fake_cli_command)
+
+    class FakeResource:
+        name = 'test_resource'
+        custom = {'dpetl_extract': {'mode': 'cli'}}
+        extrapaths = []
+
+    class FakePackage:
+        resources = [FakeResource()]
+
+    from dpetl.extract import extract
+    extract.extract_package(FakePackage(), no_stop=True, no_validate=True)
+
+    assert calls == [('cli', 'test_resource')]
 
 
 # Tests for email_connection (direct) ------------------------------------------
@@ -220,3 +244,69 @@ def test_extract_api_error(monkeypatch):
 
     with pytest.raises(requests.exceptions.RequestException):
         api.extract_api(resource)
+
+
+# Tests for CLI extraction -----------------------------------------------------
+def test_check_cli_commands_missing_arguments(caplog):
+    """Test that check_cli_commands logs an error when arguments are missing."""
+    resource = type('Resource', (), {
+        'name': 'test',
+        'custom': {'dpetl_extract': {}}  # sem 'arguments'
+    })()
+
+    command.check_cli_commands(resource)
+
+    assert 'Missing required dpetl_extract.arguments' in caplog.text
+
+
+def test_check_cli_commands_success(monkeypatch, caplog):
+    """Test that check_cli_commands runs commands successfully."""
+    import logging
+    caplog.set_level(logging.DEBUG)
+
+    resource = type('Resource', (), {
+        'name': 'test',
+        'custom': {
+            'dpetl_extract': {
+                'arguments': ['echo "hello"', 'ls -l']
+            }
+        }
+    })()
+
+    def mock_run(cmd, **kwargs):
+        return type('CompletedProcess', (), {'returncode': 0})()
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+
+    command.check_cli_commands(resource)
+
+    assert 'Running command' in caplog.text
+    assert 'CLI command failed' not in caplog.text
+
+
+def test_run_cli_command_called_process_error(monkeypatch, caplog):
+    """Test that run_cli_command handles CalledProcessError."""
+    resource = type('Resource', (), {'name': 'test'})
+
+    def mock_run(cmd, check=True):
+        raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+
+    command.run_cli_command('false', resource)
+
+    assert 'CLI command failed for resource test:' in caplog.text
+    assert 'returned non-zero exit status 1' in caplog.text
+
+
+def test_run_cli_command_file_not_found(monkeypatch, caplog):
+    """Test that run_cli_command handles FileNotFoundError."""
+    resource = type('Resource', (), {'name': 'test'})
+
+    def mock_run(cmd, check=True):
+        raise FileNotFoundError("No such file: 'nonexistent'")
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+
+    command.run_cli_command('nonexistent', resource)
+    assert "CLI command not found for resource test: No such file: 'nonexistent'" in caplog.text
