@@ -1,9 +1,10 @@
 import petl as etl
 from pathlib import Path
 from datetime import datetime
+from frictionless import Dialect
 
 
-def write_files(package, resource, path, format, extension, encoding, table):
+def write_files(package, resource, path, format, extension, encoding, table, delimiter):
     """
     Export a PETL table to the configured output format.
     """
@@ -13,7 +14,7 @@ def write_files(package, resource, path, format, extension, encoding, table):
 
     # Write file based on selected format
     if format in ['csv', 'txt']:
-        etl.tocsv(table, str(output), encoding=encoding)
+        etl.tocsv(table, str(output), encoding=encoding, delimiter=delimiter)
 
     elif format == 'xlsx':
         etl.toxlsx(table, str(output))
@@ -22,7 +23,7 @@ def write_files(package, resource, path, format, extension, encoding, table):
         raise ValueError(f'Unsupported format: {format}')
 
 
-def update_metadata(resource, path, format, compression, extension):
+def update_metadata(resource, path, format, compression, extension, delimiter):
     """
     Update resource metadata after transformation to match the generated output file.
     """
@@ -33,6 +34,7 @@ def update_metadata(resource, path, format, compression, extension):
     resource.scheme = 'file'
     resource.format = format
     resource.compression = compression
+    resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
 
     for index, field in enumerate(schema):
         target = field.custom.get('target')

@@ -33,6 +33,7 @@ def transform_package(package, **kwargs):
         compression = parts[1] if len(parts) > 1 else None
         extension = f'{format}.{compression}' if compression else format
         encoding = dpetl.get('encoding') or 'utf-8'
+        delimiter = dpetl.get('delimiter') or ','
 
         # Rename fields based on target names
         table = resource.to_petl()
@@ -42,10 +43,10 @@ def transform_package(package, **kwargs):
                 table = etl.rename(table, field.name, target)
 
         # Export the transformed data
-        datapackage.write_files(package, resource, path, format, extension, encoding, table)
+        datapackage.write_files(package, resource, path, format, extension, encoding, table, delimiter)
 
         # Update resource metadata after transformation
-        datapackage.update_metadata(resource, path, format, compression, extension)
+        datapackage.update_metadata(resource, path, format, compression, extension, delimiter)
 
         # Validate the processed resource
         if not validate.check_resource(resource, rows, errors, **kwargs):
