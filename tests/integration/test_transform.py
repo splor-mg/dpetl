@@ -58,7 +58,7 @@ def test_write_files_formats(tmp_path, format, extension):
 
     table = [['col1', 'col2'], ['a', 'b']]
 
-    datapackage.write_files(FakePackage(), FakeResource(), 'data', format, extension, 'utf-8', table)
+    datapackage.write_files(FakePackage(), FakeResource(), 'data', format, extension, 'utf-8', table, ',')
 
     assert (tmp_path / 'data' / f'test.{extension}').exists()
 
@@ -86,7 +86,7 @@ def test_update_metadata(tmp_path, monkeypatch):
     resource.schema.fields[0].custom = {'target': 'nova_col1'}
     monkeypatch.setattr(resource, 'infer', lambda *args, **kwargs: None)
 
-    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv')
+    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', ',')
 
     assert resource.path == 'processed/test.csv'
     assert resource.schema.fields[0].name == 'nova_col1'
@@ -113,7 +113,7 @@ def test_update_metadata_with_compression(tmp_path, monkeypatch):
 
     monkeypatch.setattr(resource, 'infer', lambda *args, **kwargs: None)
 
-    datapackage.update_metadata(resource, 'processed', 'csv', 'gz', 'csv.gz')
+    datapackage.update_metadata(resource, 'processed', 'csv', 'gz', 'csv.gz', ',')
 
     assert resource.compression == 'gz'
     assert resource.format == 'csv'

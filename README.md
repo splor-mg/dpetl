@@ -149,6 +149,8 @@ Reads the transformation settings from the resource's `dpetl_transform` property
 
 - `encoding`: optional (defaults to `utf-8`). Used for `csv`/`txt` files.
 
+- `delimiter`: optional (defaults to `,`). Field separator used for `csv`/`txt` files.
+
 Any field in the resource schema may define a `target` property. If defined, the field is renamed to the specified target value.
 
 Once all resources are transformed, dpetl updates the descriptor to match the generated files:
@@ -242,6 +244,7 @@ resources:
       format: csv.gz   # optional (Defaults to csv.gz)
       path: data/processed   # optional (Defaults to data)
       encoding: utf-8   # optional (Defaults to utf-8)
+      delimiter: ';'   # optional (Defaults to ,)
 
 # Load configuration (defined once per package)
 dpetl_load:
