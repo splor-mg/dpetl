@@ -2,9 +2,57 @@ import base64
 import logging
 import requests
 import subprocess
+import time
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def get_installation_token(app_id, private_key, owner, installation_id=None):
+    """
+    Generate a temporary Installation Access Token using GitHub App credentials.
+    """
+    try:
+        import jwt
+    except ImportError:
+        raise ImportError(
+            'GitHub App authentication requires additional dependencies. '
+            'Install them with: poetry install --extras github-app'
+        )
+
+    # Generate a JWT signed with the private key
+    now = int(time.time())
+    payload = {
+        'iat': now - 60,
+        'exp': now + 540,
+        'iss': str(app_id),
+    }
+    app_jwt = jwt.encode(payload, private_key, algorithm='RS256')
+
+    jwt_headers = {
+        'Authorization': f'Bearer {app_jwt}',
+        'Accept': 'application/vnd.github+json',
+    }
+
+    # Discover the installation_id if it was not provided
+    if not installation_id:
+        r = requests.get(
+            f'https://api.github.com/orgs/{owner}/installation',
+            headers=jwt_headers
+        )
+        r.raise_for_status()
+
+        installation_id = r.json()['id']
+        logger.debug(f'Installation ID automatically discovered: {installation_id}')
+
+    # Request the Installation Access Token
+    r = requests.post(
+        f'https://api.github.com/app/installations/{installation_id}/access_tokens',
+        headers=jwt_headers,
+    )
+    r.raise_for_status()
+
+    return r.json()['token']
 
 
 def repo_exists(owner, repo, token):
@@ -12,7 +60,7 @@ def repo_exists(owner, repo, token):
     Check if a GitHub repository exists for a given owner.
     """
     url = f'https://api.github.com/repos/{owner}/{repo}'
-    r = requests.get(url, headers={'Authorization': f'token {token}'})
+    r = requests.get(url, headers={'Authorization': f'Bearer {token}'})
     return r.status_code == 200
 
 
@@ -21,7 +69,7 @@ def create_repo(owner, repo, token, level, visibility):
     Create a new GitHub repository under a user or organization.
     """
     logger.info(f'Creating repository {repo}.')
-    
+
     # Select correct endpoint: user or organization
     if level == 'orgs':
         url = f'https://api.github.com/orgs/{owner}/repos'
@@ -38,8 +86,11 @@ def create_repo(owner, repo, token, level, visibility):
     r = requests.post(
         url,
         json=payload,
-        headers={'Authorization': f'token {token}'}
+        headers={'Authorization': f'Bearer {token}'}
     )
+
+    if not r.ok:
+        logger.error('GitHub API error: %s', r.json())
 
     r.raise_for_status()
 
@@ -52,7 +103,7 @@ def commit_remote(owner, repo, token, files):
     url = f'https://api.github.com/repos/{owner}/{repo}'
 
     headers = {
-        'Authorization': f'token {token}',
+        'Authorization': f'Bearer {token}',
         'Accept': 'application/vnd.github+json'
     }
 
