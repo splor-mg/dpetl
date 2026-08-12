@@ -20,6 +20,17 @@ pip install dpetl
 poetry add dpetl
 ```
 
+### Optional dependencies
+
+For GitHub App authentication, install with:
+
+```bash
+# using pip
+pip install dpetl[github-app]
+
+# using poetry
+poetry install --extras github-app
+```
 
 ## Usage
 
@@ -54,18 +65,9 @@ dpetl transform -d configs/datapackage_payroll.yaml
 dpetl extract -d datapackages/sales/datapackage.yaml -d datapackages/hr/datapackage.yaml
 ```
 
-Environment variables (`EMAIL_USER`, `EMAIL_PWD`, `EMAIL_IMAP`, `GH_TOKEN`, proxy variables) can also be defined in a `.env` file in the current working directory — it is loaded automatically.
+Environment variables for email extraction, GitHub authentication, and proxy settings can be defined in a `.env` file in the current working directory — it is loaded automatically.
 
-```dotenv
-# .env
-EMAIL_USER=user@example.com
-EMAIL_PWD=your-email-password-or-app-token
-EMAIL_IMAP=imap.gmail.com
-
-GH_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-
-HTTPS_PROXY=http://user:password@proxy-host:8080
-```
+See the [Environment Variables](#environment-variables) section for the complete list of supported variables and their usage.
 
 
 ## `extract`
@@ -171,7 +173,21 @@ Runs the ETL load phase. Uploads transformed data and the updated `datapackage.j
 dpetl load
 ```
 
-Requires the `GH_TOKEN` environment variable and reads its settings from the package's `dpetl_load` property:
+### Authentication
+
+dpetl supports two authentication methods:
+
+- **Personal Access Token (PAT):** set `GH_TOKEN`.
+
+- **GitHub App:** set `GH_APP_ID` and `GH_APP_PRIVATE_KEY`. Optionally set `GH_APP_INSTALLATION_ID` (auto‑discovered if omitted).
+
+GitHub App authentication requires the optional `github-app` extra (see [Installation](#installation)).
+
+**Remember:** The GitHub App must have `Contents` read/write permissions. If the repository does not exist yet, also grant `Administration` read/write so dpetl can create it automatically.
+
+### Configuration
+
+Reads its settings from the package's `dpetl_load` property:
 
 - `repo`: optional. Name of the target repository (defaults to the current repository).
 
@@ -303,6 +319,9 @@ Flags that can be used with any command:
 | `EMAIL_IMAP` | extract (email mode) | IMAP server address (e.g., imap.gmail.com) |
 | `HTTP_PROXY` | extract (email mode) | Proxy settings for IMAP connections* |
 | `GH_TOKEN` | load | GitHub Personal Access Token |
+| `GH_APP_ID` | load | GitHub App ID |
+| `GH_APP_PRIVATE_KEY` | load | GitHub App private key |
+| `GH_APP_INSTALLATION_ID` | load | GitHub App installation ID (optional) |
 
 All variables above can also be set in a `.env` file in the current directory instead of the shell environment.
 
