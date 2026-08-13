@@ -1,3 +1,21 @@
+## 0.11.0 (2026-08-13)
+
+### Feat
+
+- **actions**: add automated coverage badge and package release workflow
+- **load**: add GitHub App authentication support
+- **transform**: add custom delimiter support for CSV/TXT exports
+- **extract**: add CLI extractor mode to run shell commands
+- **logging**: add verbose and quiet flags, improve log messages across modules
+
+### Fix
+
+- sync local version with PyPI 0.10.0
+- **ci**: install github-app extra in coverage_release workflow
+- **ci**: install github-app extra in test workflow
+- **actions**: publish coverage badge only on main
+- **actions**: configure git user for coverage badge commit
+
 ## 0.10.0 (2026-07-21)
 
 ### Feat
