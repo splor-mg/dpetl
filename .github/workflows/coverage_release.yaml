@@ -152,19 +152,45 @@ jobs:
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --extras github-app
 
-      - name: Bump version
-        run: poetry run cz bump
+      - name: Bump version and push
+        run: |
+          set +e
+          poetry run cz bump --yes
+          status=$?
+          set -e
+          case $status in
+            0) git push origin HEAD:main --tags ;;
+            21) echo "No version bump required; skipping push." ;;
+            *) exit $status ;;
+          esac
 
       - name: Publish package
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
         run: |
-          poetry publish --build -n
+          VERSION=$(poetry version -s)
+          if poetry run python -c "import requests; exit(0 if requests.get('https://pypi.org/pypi/${VERSION}/json').status_code == 200 else 1)"; then
+            echo "Version ${VERSION} already exists on PyPI, skipping publish."
+          else
+            poetry publish --build -n
+          fi
 
-      - name: Push bump commit and tag
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git push origin HEAD:main --tags
-
+          VERSION=$(poetry version -s)
+          TAG_NAME="$VERSION"
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" &>/dev/null; then
+              echo "Release $TAG_NAME already exists, skipping."
+            else
+              gh release create "$TAG_NAME" --title "$TAG_NAME" --generate-notes
+            fi
+          else
+            echo "Tag $TAG_NAME does not exist, skipping release creation."
+          fi
+          
       - name: Workflow failure notification
         if: failure()
         uses: JasonEtco/create-an-issue@v2
