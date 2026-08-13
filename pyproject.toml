@@ -4,7 +4,13 @@ build-backend = 'poetry.core.masonry.api'
 
 [project]
 name = 'dpetl'
-version = "0.8.2"
+version = "0.10.0"
+description = ''
+authors = [
+    {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
+]
+readme = 'README.md'
+requires-python = '>=3.10,<4.0'
 dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
     'python-dotenv (>=1.2.1,<2.0.0)',
@@ -13,12 +19,6 @@ dependencies = [
     'pysocks (>=1.7.1,<2.0.0)',
     "tqdm (>=4.67.3,<5.0.0)"
 ]
-requires-python = '>=3.10,<4.0'
-authors = [
-    {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
-]
-description = ''
-readme = 'README.md'
 
 [project.optional-dependencies]
 github-app = [

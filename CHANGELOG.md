@@ -1,3 +1,47 @@
+## 0.10.0 (2026-07-21)
+
+### Feat
+
+- **extract**: add extraction module with validation
+- **transform**: always export descriptor as JSON and add datapackage validation
+- **load**: skip empty commits and add datapackage validation
+- **transform**: add datapackage validation
+
+### Fix
+
+- **load**: fix f-string syntax error on line 43
+- **email**: avoid setting date_gte to None when not filtering by today
+- **api**: handle uppercase HTTP method in sources
+
+### Refactor
+
+- **validate**: move validation logic to helpers for reuse across phases
+- **iterator**: remove toml support and simplify descriptor discovery
+- **cli**: migrate from argparse to typer
+
+## 0.9.0 (2026-06-29)
+
+### Feat
+
+- **actions**: add test and test_coverage actions
+- **README.md**: add coverage badge to README
+- **load**: add initial structure
+- **load**: add load operation
+- **load**: add load subcommands to CLI
+- **transform**: add transform subcommands to CLI
+- **transform**: add initial structure
+- **transform**: add transform operation
+- **extract**: add operation argument
+
+### Refactor
+
+- **pyproject**: review rre and post test tasks
+- **load**: use descriptor parameters for repository configuration
+- **load**: improve GitHub integration and repository configuration
+- **load**: remove CLI arguments
+- **transform**: reorganize transform code
+- **transform**: use dpetl_transform for configurable output
+
 ## 0.8.2 (2026-04-23)
 
 ### Fix
