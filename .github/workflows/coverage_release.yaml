@@ -177,7 +177,7 @@ jobs:
 
       - name: Create GitHub Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERSION=$(poetry version -s)
           TAG_NAME="$VERSION"
@@ -190,7 +190,7 @@ jobs:
           else
             echo "Tag $TAG_NAME does not exist, skipping release creation."
           fi
-          
+
       - name: Workflow failure notification
         if: failure()
         uses: JasonEtco/create-an-issue@v2
