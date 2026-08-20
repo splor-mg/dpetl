@@ -1,7 +1,9 @@
+import os
 import logging
 import petl as etl
+from dotenv import load_dotenv, find_dotenv
 
-from dpetl.transform import datapackage
+from dpetl.transform import datapackage, anonymize
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
@@ -14,6 +16,10 @@ def transform_package(package, **kwargs):
     # Validate the datapackage before processing
     validate.validate_datapackage(package, **kwargs)
 
+    # Load the anonymization secret key if present
+    load_dotenv(find_dotenv(usecwd=True))
+    secret_key = os.environ.get('ANONYMIZE_SECRET_KEY')
+
     rows = []
     errors = []
 
@@ -25,28 +31,24 @@ def transform_package(package, **kwargs):
         )
 
         # Define output settings
-        dpetl = resource.custom.get('dpetl_transform', {})
-        parts = (dpetl.get('format') or 'csv.gz').split('.')
+        settings = datapackage.get_output_settings(resource)
 
-        path = dpetl.get('path') or 'data'
-        format = parts[0]
-        compression = parts[1] if len(parts) > 1 else None
-        extension = f'{format}.{compression}' if compression else format
-        encoding = dpetl.get('encoding') or 'utf-8'
-        delimiter = dpetl.get('delimiter') or ','
-
-        # Rename fields based on target names
+        # Apply transformation functions to a field
         table = resource.to_petl()
         for field in resource.schema.fields:
+            # Anonymize field
+            table = anonymize.apply_anonymization(field, table, secret_key)
+
+            # Rename fields based on target names
             target = field.custom.get('target')
             if target:
                 table = etl.rename(table, field.name, target)
 
         # Export the transformed data
-        datapackage.write_files(package, resource, path, format, extension, encoding, table, delimiter)
+        datapackage.write_files(package, resource, table, **settings)
 
         # Update resource metadata after transformation
-        datapackage.update_metadata(resource, path, format, compression, extension, delimiter)
+        datapackage.update_metadata(resource, **settings)
 
         # Validate the processed resource
         if not validate.check_resource(resource, rows, errors, **kwargs):

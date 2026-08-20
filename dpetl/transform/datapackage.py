@@ -3,8 +3,29 @@ from pathlib import Path
 from datetime import datetime
 from frictionless import Dialect
 
+from dpetl.transform import anonymize
 
-def write_files(package, resource, path, format, extension, encoding, table, delimiter):
+
+def get_output_settings(resource):
+    """
+    Extract output settings from the resource custom metadata.
+    """
+    dpetl = resource.custom.get('dpetl_transform', {})
+    parts = (dpetl.get('format') or 'csv.gz').split('.')
+    format = parts[0]
+    compression = parts[1] if len(parts) > 1 else None
+
+    return {
+        'path': dpetl.get('path') or 'data',
+        'format': format,
+        'compression': compression,
+        'extension': f'{format}.{compression}' if compression else format,
+        'encoding': dpetl.get('encoding') or 'utf-8',
+        'delimiter': dpetl.get('delimiter') or ',',
+    }
+
+
+def write_files(package, resource, table, path, format, extension, encoding, delimiter, **kwargs):
     """
     Export a PETL table to the configured output format.
     """
@@ -23,7 +44,7 @@ def write_files(package, resource, path, format, extension, encoding, table, del
         raise ValueError(f'Unsupported format: {format}')
 
 
-def update_metadata(resource, path, format, compression, extension, delimiter):
+def update_metadata(resource, path, format, compression, extension, delimiter, **kwargs):
     """
     Update resource metadata after transformation to match the generated output file.
     """
@@ -36,15 +57,19 @@ def update_metadata(resource, path, format, compression, extension, delimiter):
     resource.compression = compression
     resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
 
+    # Update field properties
     for index, field in enumerate(schema):
         target = field.custom.get('target')
 
-        if target:
-            schema[index] = field.to_copy(name=target)
+        schema[index] = field.to_copy(
+            name=target or field.name,
+            constraints=anonymize.build_constraints(field),
+        )
 
-    # Remove target metadata from all fields
+    # Remove custom property from all fields
     for field in schema:
         field.custom.pop('target', None)
+        field.custom.pop('anonymize', None)
 
     # Clear extrapaths and infer schema from the output file
     resource.extrapaths = None
