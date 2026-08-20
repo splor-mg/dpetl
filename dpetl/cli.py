@@ -4,7 +4,7 @@ from typing import Annotated, Optional
 from importlib.metadata import version
 
 from .extract.cli import extract
-from .transform.cli import transform
+from .transform.cli import transform_app
 from .load.cli import load
 
 
@@ -12,7 +12,7 @@ app = typer.Typer(name='etl', help='ETL Command Line Interface',
                   pretty_exceptions_show_locals=False)
 
 app.command()(extract)
-app.command()(transform)
+app.add_typer(transform_app, name='transform', help='Simplified some ETL transform operations.')
 app.command()(load)
 
 
