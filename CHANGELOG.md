@@ -1,3 +1,10 @@
+## 0.12.0 (2026-08-20)
+
+### Feat
+
+- **cli**: add transform keygen subcommand
+- **transform**: add anonymization module and field properties
+
 ## 0.11.0 (2026-08-13)
 
 ### Feat
