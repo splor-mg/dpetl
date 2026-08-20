@@ -5,6 +5,7 @@ Tests both command dispatching (via mocks) and the full integration flow.
 import re
 import shutil
 from typer.testing import CliRunner
+
 from dpetl.cli import app
 
 runner = CliRunner()
@@ -39,6 +40,19 @@ def test_transform_command_calls_descriptor_iteration(mock_descriptor_iteration)
     kwargs = mock_descriptor_iteration[0]
     assert kwargs['operation'] == 'transform'
     assert kwargs.get('descriptor') is None
+
+
+def test_transform_keygen_command():
+    """
+    Test the keygen subcommand generates a valid secret key.
+    """
+    result = runner.invoke(app, ['transform', 'keygen'])
+    assert result.exit_code == 0
+    output = result.output.strip()
+    assert output.startswith('ANONYMIZE_SECRET_KEY=')
+    key = output.split('=')[1]
+    assert len(key) == 64
+    assert all(c in '0123456789abcdef' for c in key)
 
 
 def test_load_command_calls_descriptor_iteration(mock_descriptor_iteration):
@@ -107,21 +121,27 @@ def test_extract_integration(tmp_path):
 
 # Logging flags test -----------------------------------------------------------
 def test_verbose_and_quiet_conflict():
-    """Test that --verbose and --quiet cannot be used together."""
+    """
+    Test that --verbose and --quiet cannot be used together.
+    """
     result = runner.invoke(app, ['--verbose', '--quiet', 'extract'])
     assert result.exit_code == 2
-    assert "cannot be used together" in result.output
+    assert 'cannot be used together' in result.output
 
 
 def test_verbose_creates_log_file(tmp_path, monkeypatch):
-    """Test that --verbose creates a debug log file."""
+    """
+    Test that --verbose creates a debug log file.
+    """
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ['--verbose', 'extract'], obj={'no_validate': True, 'no_stop': True})
     assert (tmp_path / 'dpetl.debug.log').exists()
 
 
 def test_quiet_does_not_create_log_file(tmp_path, monkeypatch):
-    """Test that --quiet does not create a debug log file."""
+    """
+    Test that --quiet does not create a debug log file.
+    """
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ['--help', '--quiet'])
     assert result.exit_code == 0
@@ -129,7 +149,9 @@ def test_quiet_does_not_create_log_file(tmp_path, monkeypatch):
 
 
 def test_verbose_sets_debug_level(monkeypatch, tmp_path):
-    """Test that --verbose sets logging level to DEBUG."""
+    """
+    Test that --verbose sets logging level to DEBUG.
+    """
     import logging
     from dpetl.cli import setup_logging
 
@@ -144,7 +166,9 @@ def test_verbose_sets_debug_level(monkeypatch, tmp_path):
 
 
 def test_default_logging_level(monkeypatch, tmp_path):
-    """Test that default logging level is INFO."""
+    """
+    Test that default logging level is INFO.
+    """
     import logging
     from dpetl.cli import setup_logging
 
@@ -157,7 +181,9 @@ def test_default_logging_level(monkeypatch, tmp_path):
 
 
 def test_quiet_sets_warning_level(monkeypatch, tmp_path):
-    """Test that --quiet sets logging level to WARNING."""
+    """
+    Test that --quiet sets logging level to WARNING.
+    """
     import logging
     from dpetl.cli import setup_logging
 
@@ -167,3 +193,22 @@ def test_quiet_sets_warning_level(monkeypatch, tmp_path):
 
     setup_logging(verbose=False, quiet=True)
     assert logging.getLogger().level == logging.WARNING
+
+
+# Validate flags test ----------------------------------------------------------
+def test_validate_before_and_no_validate_conflict():
+    """
+    Test that --validate-before and --no-validate cannot be used together.
+    """
+    result = runner.invoke(app, ['--validate-before', '--no-validate', 'transform'])
+    assert result.exit_code == 2
+    assert 'cannot be used together' in result.output
+
+
+def test_validate_before_not_supported_for_extract():
+    """
+    Test that --validate-before is not supported for the extract command.
+    """
+    result = runner.invoke(app, ['--validate-before', 'extract'])
+    assert result.exit_code == 2
+    assert 'not supported' in result.output and 'extract' in result.output
