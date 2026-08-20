@@ -134,12 +134,17 @@ If the resource declares `extrapaths` (multiple files for the same resource), th
 
 ## `transform`
 
-Runs the ETL transformation phase. Applies column renaming, format conversion, and other transformations defined in the datapackage.
+Runs the ETL transformation phase. Applies column renaming, format conversion, and other transformations defined in the datapackage (see [Example Data Package Configuration](#example-data-package-configuration)).
 
 ```bash
 # Run transform using the default datapackage.yaml descriptor
 dpetl transform
+
+# Generate a secret key for AES‑SIV anonymization
+dpetl transform keygen
 ```
+
+### Resource properties
 
 Reads the transformation settings from the resource's `dpetl_transform` property:
 
@@ -153,15 +158,38 @@ Reads the transformation settings from the resource's `dpetl_transform` property
 
 - `delimiter`: optional (defaults to `,`). Field separator used for `csv`/`txt` files.
 
-Any field in the resource schema may define a `target` property. If defined, the field is renamed to the specified target value.
+Once all resources are transformed, each resource is converted to a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
 
-Once all resources are transformed, dpetl updates the descriptor to match the generated files:
+### Field properties
 
-- Each resource is converted to a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
+Any field in the resource schema may define additional properties to modify its behaviour.
 
-- Field names are updated based on their target values, and the `target` property is removed.
+#### `target`
 
-- An `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
+If a field defines a `target` property, the field is renamed to the specified target value. After transformation, the `target` property is removed.
+
+#### `anonymize`
+
+Fields can be anonymized during transformation by defining an `anonymize` property.
+
+Supported `method` values:
+
+- `sha256`: deterministic hash (first 16 hex chars) – requires no secret key.
+
+- `aes_siv`: deterministic encryption (AES-SIV) – requires `ANONYMIZE_SECRET_KEY`.
+  - `context`: optional **context tweak** – uses another field's value as a cryptographic context, so identical values in different contexts produce different tokens.
+  - `annotation`: optional **surrogate annotation** – a human‑readable prefix prepended to the encrypted value.
+
+- `[pattern]`: mask pattern, e.g. `[###-###]` or `[###-###|####-####]`.
+  - `#` preserves the original digit.
+  - `*` masks the digit (replaces with `*`).
+  - Other characters are literals.
+
+To generate a secret key for AES‑SIV, use: `dpetl transform keygen`
+
+After transformation, any `anonymize` properties are removed from the field metadata.
+
+> **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
 
 
 ## `load`
@@ -262,6 +290,30 @@ resources:
       encoding: utf-8   # optional (Defaults to utf-8)
       delimiter: ';'   # optional (Defaults to ,)
 
+# Example 5: Anonymization of sensitive fields
+- name: customers
+  path: data/customers.csv
+  schema:
+    fields:
+      - name: name
+        type: string
+        target: customer_name
+        custom:
+          anonymize:
+            method: '[#***]'
+      - name: cpf
+        type: string
+        custom:
+          anonymize:
+            method: aes_siv
+            context: ano
+            annotation: CPF:11|CNPJ:14
+      - name: phone
+        type: string
+        custom:
+          anonymize:
+            method: '[###-***-####]'
+
 # Load configuration (defined once per package)
 dpetl_load:
   owner: github-username
@@ -318,6 +370,7 @@ Flags that can be used with any command:
 | `EMAIL_PWD` | extract (email mode) | Password for IMAP email connection |
 | `EMAIL_IMAP` | extract (email mode) | IMAP server address (e.g., imap.gmail.com) |
 | `HTTP_PROXY` | extract (email mode) | Proxy settings for IMAP connections* |
+| `ANONYMIZE_SECRET_KEY` | transform | Secret key for AES‑SIV anonymization |
 | `GH_TOKEN` | load | GitHub Personal Access Token |
 | `GH_APP_ID` | load | GitHub App ID |
 | `GH_APP_PRIVATE_KEY` | load | GitHub App private key |
