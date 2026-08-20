@@ -1,6 +1,5 @@
 """
 Integration tests for the transformation module.
-Tests: write_files, update_metadata, build_datapackage, and transform_package.
 """
 import csv
 import pytest
@@ -33,7 +32,80 @@ def test_transform_package(fake_package, monkeypatch):
     assert calls == ['write', 'update', 'build']
 
 
-# Tests for write_files  -------------------------------------------------------
+def test_transform_package_with_anonymize(tmp_path, monkeypatch, caplog):
+    """
+    Test that transform_package applies anonymization to resources.
+    """
+    import logging
+    caplog.set_level(logging.DEBUG)
+
+    monkeypatch.setenv('ANONYMIZE_SECRET_KEY', '0123456789abcdef0123456789abcdef')
+
+    data_dir = tmp_path / 'data'
+    data_dir.mkdir()
+    csv_path = data_dir / 'test.csv'
+    with open(csv_path, 'w', encoding='utf-8') as f:
+        f.write('col1\nvalor1\nvalor2\n')
+
+    resource = Resource.from_descriptor({
+        'name': 'test',
+        'path': 'data/test.csv',
+        'schema': {
+            'fields': [
+                {'name': 'col1', 'type': 'string'}
+            ]
+        },
+        'custom': {'dpetl_transform': {'format': 'csv'}}
+    }, basepath=str(tmp_path))
+
+    # Force custom anonymize on the field
+    resource.schema.fields[0].custom = {'anonymize': {'method': 'sha256'}}
+
+    package = Package(resources=[resource], basepath=str(tmp_path))
+
+    monkeypatch.setattr('dpetl.transform.transform.validate.validate_datapackage', lambda *a, **k: None)
+    monkeypatch.setattr('dpetl.transform.transform.validate.validate_resources', lambda *a, **k: None)
+    monkeypatch.setattr('dpetl.transform.transform.datapackage.build_datapackage', lambda *a, **k: None)
+
+    transform.transform_package(package)
+
+    assert 'Anonymizing field' in caplog.text
+
+
+# Tests for get_output_settings ------------------------------------------------
+def test_get_output_settings():
+    """
+    Test extracting output settings from resource custom metadata.
+    """
+    resource = type('Resource', (), {
+        'custom': {
+            'dpetl_transform': {
+                'path': 'custom_data',
+                'format': 'csv.gz',
+                'encoding': 'latin1',
+                'delimiter': ';'
+            }
+        }
+    })()
+    settings = datapackage.get_output_settings(resource)
+    assert settings['path'] == 'custom_data'
+    assert settings['format'] == 'csv'
+    assert settings['compression'] == 'gz'
+    assert settings['extension'] == 'csv.gz'
+    assert settings['encoding'] == 'latin1'
+    assert settings['delimiter'] == ';'
+
+    resource2 = type('Resource', (), {'custom': {}})()
+    settings2 = datapackage.get_output_settings(resource2)
+    assert settings2['path'] == 'data'
+    assert settings2['format'] == 'csv'
+    assert settings2['compression'] == 'gz'
+    assert settings2['extension'] == 'csv.gz'
+    assert settings2['encoding'] == 'utf-8'
+    assert settings2['delimiter'] == ','
+
+
+# Tests for write_files --------------------------------------------------------
 @pytest.mark.parametrize(('format', 'extension'), [
     ('csv', 'csv'),
     ('txt', 'txt'),
@@ -58,7 +130,7 @@ def test_write_files_formats(tmp_path, format, extension):
 
     table = [['col1', 'col2'], ['a', 'b']]
 
-    datapackage.write_files(FakePackage(), FakeResource(), 'data', format, extension, 'utf-8', table, ',')
+    datapackage.write_files(FakePackage(), FakeResource(), table, 'data', format, extension, 'utf-8', ',')
 
     assert (tmp_path / 'data' / f'test.{extension}').exists()
 
@@ -119,6 +191,44 @@ def test_update_metadata_with_compression(tmp_path, monkeypatch):
     assert resource.format == 'csv'
     assert resource.path == 'processed/test.csv.gz'
 
+
+def test_update_metadata_with_anonymize(tmp_path, monkeypatch):
+    """
+    Test that update_metadata adds constraints from anonymize config.
+    """
+    basepath = tmp_path
+    data_dir = basepath / 'data'
+    data_dir.mkdir()
+    csv_path = data_dir / 'data.csv'
+    with open(csv_path, 'w', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['col1'])
+        writer.writerow(['valor1'])
+
+    resource = Resource.from_descriptor({
+        'name': 'test',
+        'path': 'data/data.csv',
+        'schema': {
+            'fields': [
+                {
+                    'name': 'col1',
+                    'type': 'string'
+                }
+            ]
+        }
+    }, basepath=str(basepath))
+
+    # Force custom anonymize on the field
+    resource.schema.fields[0].custom = {'anonymize': {'method': 'sha256'}}
+
+    monkeypatch.setattr(resource, 'infer', lambda *args, **kwargs: None)
+
+    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', ',')
+
+    constraints = resource.schema.fields[0].constraints
+    assert 'pattern' in constraints
+    assert constraints['pattern'] == '^[0-9a-f]{16}$'
+    
 
 # Tests for build_datapackage --------------------------------------------------
 @pytest.mark.parametrize(('descriptor_name', 'expected_json'), [
