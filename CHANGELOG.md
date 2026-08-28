@@ -1,3 +1,14 @@
+## 0.13.0 (2026-08-28)
+
+### Feat
+
+- **load**: clean up obsolete resources on load
+
+### Fix
+
+- **ci**: use atomic push for version bump and tag
+- **ci**: pin checkout ref to main in coverage_release workflow
+
 ## 0.12.0 (2026-08-20)
 
 ### Feat
