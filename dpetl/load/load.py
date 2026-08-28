@@ -57,7 +57,7 @@ def load_package(package, **kwargs):
         with open(file, 'rb') as f:
             files[resource.path] = f.read()
 
-    [package.custom.pop(key, None) for key in ['dpetl_load']]
+    [package.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform', 'dpetl_load']]
     files['datapackage.json'] = package.to_json().encode()
 
     validate.validate_datapackage(package, **kwargs)

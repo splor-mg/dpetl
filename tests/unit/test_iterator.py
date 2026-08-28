@@ -165,6 +165,97 @@ def test_descriptor_iteration_with_datapackages_folder(monkeypatch, tmp_path):
     assert sorted(calls) == ['pkg_from_pkg1', 'pkg_from_pkg2']
 
 
+# Tests for package skip functionality ----------------------------------------
+def test_resources_iteration_skip_package_when_disabled(monkeypatch, caplog):
+    """
+    Test that resources_iteration skips the package when operation is disabled.
+    """
+    import logging
+    caplog.set_level(logging.INFO)
+
+    package = type('Package', (), {
+        'name': 'test_pkg',
+        'custom': {'dpetl_extract': {'enabled': False}}
+    })()
+
+    def fake_extract_package(*args, **kwargs):
+        raise AssertionError("extract_package should not be called")
+
+    monkeypatch.setattr('dpetl.extract.extract.extract_package', fake_extract_package)
+
+    from dpetl.helpers.iterator import resources_iteration
+    resources_iteration(package, operation='extract')
+
+    assert "Skipping extract for package test_pkg." in caplog.text
+
+
+def test_resources_iteration_skip_package_when_disabled_as_bool(monkeypatch, caplog):
+    """
+    Test that resources_iteration skips the package when dpetl_{operation} is a boolean False.
+    """
+    import logging
+    caplog.set_level(logging.INFO)
+
+    package = type('Package', (), {
+        'name': 'test_pkg',
+        'custom': {'dpetl_extract': False}
+    })()
+
+    def fake_extract_package(*args, **kwargs):
+        raise AssertionError("extract_package should not be called")
+
+    monkeypatch.setattr('dpetl.extract.extract.extract_package', fake_extract_package)
+
+    from dpetl.helpers.iterator import resources_iteration
+    resources_iteration(package, operation='extract')
+
+    assert "Skipping extract for package test_pkg." in caplog.text
+
+
+def test_resources_iteration_process_package_when_enabled(monkeypatch):
+    """
+    Test that resources_iteration processes the package when enabled is True (default or explicit).
+    """
+    calls = []
+
+    package = type('Package', (), {
+        'name': 'test_pkg',
+        'custom': {'dpetl_extract': {'enabled': True}}
+    })()
+
+    def fake_extract_package(pkg, **kwargs):
+        calls.append(pkg.name)
+
+    monkeypatch.setattr('dpetl.extract.extract.extract_package', fake_extract_package)
+
+    from dpetl.helpers.iterator import resources_iteration
+    resources_iteration(package, operation='extract')
+
+    assert calls == ['test_pkg']
+
+
+def test_resources_iteration_process_package_when_no_config(monkeypatch):
+    """
+    Test that resources_iteration processes the package when no config is present (default enabled).
+    """
+    calls = []
+
+    package = type('Package', (), {
+        'name': 'test_pkg',
+        'custom': {}
+    })()
+
+    def fake_extract_package(pkg, **kwargs):
+        calls.append(pkg.name)
+
+    monkeypatch.setattr('dpetl.extract.extract.extract_package', fake_extract_package)
+
+    from dpetl.helpers.iterator import resources_iteration
+    resources_iteration(package, operation='extract')
+
+    assert calls == ['test_pkg']
+
+
 # Tests for resources_iteration ------------------------------------------------
 def test_resources_iteration_transform_operation(monkeypatch, fake_package):
     """
