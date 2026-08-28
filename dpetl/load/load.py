@@ -38,32 +38,16 @@ def load_package(package, **kwargs):
     Load data and metadata from a datapackage into a GitHub repository.
     """
     # Prepare config and repository paths
-    dpetl = package.custom.get('dpetl_load', {})
-    owner = dpetl.get('owner')
-    repo   = dpetl.get('repo')
-    level  = dpetl.get('level') or 'user'
-    visibility = dpetl.get('visibility') or 'private'
-
-    if repo and not owner:
-        logger.error('Missing required field "owner" in "dpetl_load".')
-        raise SystemExit(1)
-
-    if level not in ('user', 'orgs'):
-        logger.error('Field "level" in "dpetl_load" must be "user" or "orgs".')
-        raise SystemExit(1)
-
-    if visibility not in ('public', 'private'):
-        logger.error('Field "visibility" in "dpetl_load" must be "public" or "private".')
-        raise SystemExit(1)
+    settings = github.get_repo_settings(package)
 
     load_dotenv(find_dotenv(usecwd=True))
-    token = _get_token(owner)
+    token = _get_token(settings['owner'])
 
-    logger.debug(f'Processing {repo or "local commit"}.')
+    logger.debug(f'Processing {settings["repo"] or "local commit"}.')
 
     # Ensure remote repository exists
-    if repo and not github.repo_exists(owner, repo, token):
-        github.create_repo(owner, repo, token, level, visibility)
+    if settings['repo'] and not github.repo_exists(token, **settings):
+        github.create_repo(token, **settings)
 
     # Prepare files to send
     files = {}
@@ -81,7 +65,9 @@ def load_package(package, **kwargs):
     # Commit all files in a single commit
     logger.debug('Committing data package.')
 
-    if repo:
-        github.commit_remote(owner, repo, token, files)
+    deletions = github.get_deletions(token, files, **settings)
+
+    if settings['repo']:
+        github.commit_remote(token, files, deletions, **settings)
     else:
-        github.commit_local(files)
+        github.commit_local(files, deletions)

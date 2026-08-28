@@ -1,3 +1,7 @@
+"""
+Integration tests for the load module:
+GitHub repository operations, authentication, and commit handling.
+"""
 import pytest
 import requests
 import subprocess
@@ -17,10 +21,10 @@ class FakePackage:
         return '{}'
 
 
-# Fixture para criar um pacote com um recurso dummy em um diretório temporário
+# Fixture ----------------------------------------------------------------------
 @pytest.fixture
 def fake_package_with_resource(tmp_path):
-    """Cria um FakePackage com um recurso dummy e um arquivo CSV."""
+    """Create a FakePackage with a dummy resource and a CSV file."""
     data_dir = tmp_path / 'data'
     data_dir.mkdir()
     (data_dir / 'file.csv').write_text('dummy')
@@ -41,32 +45,37 @@ def fake_package_with_resource(tmp_path):
 
 # Tests for load_package -------------------------------------------------------
 def test_load_package_flow(monkeypatch, fake_package_with_resource):
-    """Test the full flow: validate, repo_exists, commit_remote."""
+    """Test the full flow: validate, repo_exists, get_deletions, commit_remote."""
     package = fake_package_with_resource
     calls = []
 
-    def fake_validate(*a):
+    def fake_validate(*args, **kwargs):
         calls.append('validate')
 
-    def fake_repo_exists(*a):
+    def fake_repo_exists(*args, **kwargs):
         calls.append('repo_exists')
         return True
 
-    def fake_create_repo(*a):
+    def fake_get_deletions(*args, **kwargs):
+        calls.append('get_deletions')
+        return set()
+
+    def fake_create_repo(*args, **kwargs):
         calls.append('create_repo')
 
-    def fake_commit_remote(*a):
+    def fake_commit_remote(*args, **kwargs):
         calls.append('commit_remote')
 
     monkeypatch.setenv('GH_TOKEN', 'fake')
     monkeypatch.setattr('dpetl.load.load._get_token', lambda *a: 'fake_token')
     monkeypatch.setattr('dpetl.load.load.github.repo_exists', fake_repo_exists)
+    monkeypatch.setattr('dpetl.load.load.github.get_deletions', fake_get_deletions)
     monkeypatch.setattr('dpetl.load.load.github.create_repo', fake_create_repo)
     monkeypatch.setattr('dpetl.load.load.github.commit_remote', fake_commit_remote)
     monkeypatch.setattr('dpetl.load.load.validate.validate_datapackage', fake_validate)
 
     load.load_package(package)
-    assert set(calls) == {'validate', 'repo_exists', 'commit_remote'}
+    assert set(calls) == {'validate', 'repo_exists', 'get_deletions', 'commit_remote'}
 
 
 @pytest.mark.parametrize(('custom', 'missing_field'), [
@@ -90,35 +99,40 @@ def test_load_package_repo_creation(monkeypatch, fake_package_with_resource):
     package = fake_package_with_resource
     calls = []
 
-    def fake_repo_exists(*a):
+    def fake_repo_exists(*args, **kwargs):
         calls.append('repo_exists')
         return False
 
-    def fake_create_repo(*a):
+    def fake_get_deletions(*args, **kwargs):
+        calls.append('get_deletions')
+        return set()
+
+    def fake_create_repo(*args, **kwargs):
         calls.append('create_repo')
 
-    def fake_commit_remote(*a):
+    def fake_commit_remote(*args, **kwargs):
         calls.append('commit_remote')
 
     monkeypatch.setenv('GH_TOKEN', 'fake')
     monkeypatch.setattr('dpetl.load.load._get_token', lambda *a: 'fake_token')
     monkeypatch.setattr('dpetl.load.load.github.repo_exists', fake_repo_exists)
+    monkeypatch.setattr('dpetl.load.load.github.get_deletions', fake_get_deletions)
     monkeypatch.setattr('dpetl.load.load.github.create_repo', fake_create_repo)
     monkeypatch.setattr('dpetl.load.load.github.commit_remote', fake_commit_remote)
     monkeypatch.setattr('dpetl.load.load.validate.validate_datapackage', lambda *a: None)
 
     load.load_package(package)
-    assert calls == ['repo_exists', 'create_repo', 'commit_remote']
+    assert calls == ['repo_exists', 'create_repo', 'get_deletions', 'commit_remote']
 
 
 def test_load_package_local_commit(monkeypatch, tmp_path):
     """Test load_package when repo is not set (local commit)."""
     calls = []
 
-    def fake_validate(*a):
+    def fake_validate(*args, **kwargs):
         calls.append('validate')
 
-    def fake_commit_local(*a):
+    def fake_commit_local(*args, **kwargs):
         calls.append('commit_local')
 
     package = FakePackage(
@@ -136,7 +150,7 @@ def test_load_package_local_commit(monkeypatch, tmp_path):
     assert 'commit_local' in calls
 
 
-# Tests for _get_token() -------------------------------------------------------
+# Tests for _get_token ---------------------------------------------------------
 def test_get_token_github_app_priority(monkeypatch):
     """Test that GH_APP_ID + GH_APP_PRIVATE_KEY has priority over GH_TOKEN."""
     from dpetl.load.load import _get_token
@@ -183,7 +197,7 @@ def test_repo_exists(monkeypatch, status_code, expected):
     def mock_get(*args, **kwargs):
         return SimpleNamespace(status_code=status_code)
     monkeypatch.setattr(requests, 'get', mock_get)
-    assert github.repo_exists('owner', 'repo', 'token') is expected
+    assert github.repo_exists('token', 'owner', 'repo') is expected
 
 
 # Tests for github.create_repo -------------------------------------------------
@@ -209,7 +223,7 @@ def test_create_repo(monkeypatch):
 
     monkeypatch.setattr(requests, 'post', mock_post)
 
-    github.create_repo('owner', 'repo', 'token', 'user', 'private')
+    github.create_repo('token', 'owner', 'repo', 'user', 'private')
 
     assert payload['name'] == 'repo'
     assert payload['private'] is True
@@ -234,7 +248,7 @@ def test_create_repo_api_error(monkeypatch, caplog):
     monkeypatch.setattr(requests, 'post', mock_post)
 
     with pytest.raises(requests.exceptions.HTTPError):
-        github.create_repo('owner', 'repo', 'token', 'user', 'private')
+        github.create_repo('token', 'owner', 'repo', 'user', 'private')
 
     assert "GitHub API error: {'message': 'Validation failed'}" in caplog.text
 
@@ -243,6 +257,7 @@ def test_create_repo_api_error(monkeypatch, caplog):
 def test_commit_remote(monkeypatch):
     """Test commit_remote creates one blob per file and commits."""
     files = {'a.txt': b'x', 'b.csv': b'y'}
+    deletions = set()
     post_calls = []
     patch_called = False
 
@@ -271,10 +286,53 @@ def test_commit_remote(monkeypatch):
     monkeypatch.setattr(requests, 'post', mock_post)
     monkeypatch.setattr(requests, 'patch', mock_patch)
 
-    github.commit_remote('owner', 'repo', 'token', files)
+    github.commit_remote('token', files, deletions, owner='owner', repo='repo')
 
     blob_posts = [u for u in post_calls if 'blobs' in u]
     assert len(blob_posts) == len(files)
+    assert patch_called is True
+
+
+def test_commit_remote_with_deletions(monkeypatch):
+    """Test commit_remote removes files listed in deletions."""
+    files = {'new_file.csv': b'x'}
+    deletions = {'old_file.csv'}
+
+    post_calls = []
+    patch_called = False
+
+    def mock_get(url, headers=None):
+        data = {}
+        if url == 'https://api.github.com/repos/owner/repo':
+            data = {'default_branch': 'main'}
+        elif '/git/refs/heads/' in url:
+            data = {'object': {'sha': 'head_sha'}}
+        elif '/git/commits' in url:
+            data = {'tree': {'sha': 'base_tree_sha'}}
+        return SimpleNamespace(status_code=200, json=lambda: data, raise_for_status=lambda: None)
+
+    def mock_post(url, headers=None, json=None):
+        nonlocal post_calls
+        post_calls.append(url)
+        if '/git/trees' in url:
+            # Check that the tree contains an item with sha None
+            assert any(item.get('sha') is None for item in json.get('tree', []))
+            return SimpleNamespace(status_code=201, json=lambda: {'sha': 'new_tree_sha'}, raise_for_status=lambda: None)
+        elif '/git/blobs' in url:
+            return SimpleNamespace(status_code=201, json=lambda: {'sha': 'blob_sha'}, raise_for_status=lambda: None)
+        else:
+            return SimpleNamespace(status_code=201, json=lambda: {'sha': 'new_commit_sha'}, raise_for_status=lambda: None)
+
+    def mock_patch(url, headers=None, json=None):
+        nonlocal patch_called
+        patch_called = True
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None)
+
+    monkeypatch.setattr(requests, 'get', mock_get)
+    monkeypatch.setattr(requests, 'post', mock_post)
+    monkeypatch.setattr(requests, 'patch', mock_patch)
+
+    github.commit_remote('token', files, deletions, owner='owner', repo='repo')
     assert patch_called is True
 
 
@@ -307,7 +365,7 @@ def test_commit_remote_no_changes(monkeypatch):
     monkeypatch.setattr(requests, 'post', mock_post)
     monkeypatch.setattr(requests, 'patch', mock_patch)
 
-    github.commit_remote('owner', 'repo', 'token', files)
+    github.commit_remote('token', files, set(), owner='owner', repo='repo')
 
 
 # Tests for github.commit_local ------------------------------------------------
@@ -342,3 +400,32 @@ def test_commit_local(monkeypatch, files, has_changes, expected_commands):
     if has_changes:
         assert commands[2][0:3] == ['git', 'commit', '-m']
         assert commands[3] == ['git', 'push']
+
+
+def test_commit_local_with_deletions(monkeypatch):
+    """Test commit_local removes outdated resources."""
+    commands = []
+    deletions = {'old_file.csv'}
+
+    def mock_run(cmd, check=False, capture_output=False, **kwargs):
+        commands.append(cmd)
+        if cmd == ['git', 'diff', '--cached', '--quiet']:
+            ret = SimpleNamespace(returncode=1)
+        else:
+            ret = SimpleNamespace(returncode=0)
+        return ret
+
+    def mock_check_output(cmd, **kwargs):
+        if cmd == ['git', 'rev-parse', '--short', 'HEAD']:
+            return 'abc1234\n'
+        return b''
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr(subprocess, 'check_output', mock_check_output)
+
+    github.commit_local({'new_file.csv': b'x'}, deletions)
+
+    assert ['git', 'rm', '-f', '--ignore-unmatch', 'old_file.csv'] in commands
+    assert ['git', 'add', '-f', 'new_file.csv'] in commands
+    assert any(cmd[0:3] == ['git', 'commit', '-m'] for cmd in commands)
+    assert ['git', 'push'] in commands

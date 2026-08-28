@@ -1,17 +1,24 @@
+"""
+Unit tests for the github module: installation tokens,
+repository settings, descriptor retrieval, and deletion detection.
+"""
 import pytest
+import base64
 import requests
+import subprocess
+
 from dpetl.load import github
 
 
 def test_get_installation_token_missing_dependencies(monkeypatch):
-    """Testa que ImportError é levantado se PyJWT não estiver instalado."""
+    """Test that ImportError is raised if PyJWT is not installed."""
     monkeypatch.setitem(__import__('sys').modules, 'jwt', None)
     with pytest.raises(ImportError, match="GitHub App authentication requires additional dependencies"):
         github.get_installation_token('123', 'key', 'owner')
 
 
 def test_get_installation_token_with_installation_id(monkeypatch):
-    """Testa sucesso com installation_id fornecido."""
+    """Test success with installation_id provided."""
     import jwt
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
 
@@ -28,7 +35,7 @@ def test_get_installation_token_with_installation_id(monkeypatch):
 
 
 def test_get_installation_token_auto_discovery(monkeypatch):
-    """Testa descoberta automática do installation_id."""
+    """Test automatic discovery of installation_id."""
     import jwt
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
 
@@ -58,7 +65,7 @@ def test_get_installation_token_auto_discovery(monkeypatch):
 
 
 def test_get_installation_token_request_failure(monkeypatch):
-    """Testa erro quando a requisição falha."""
+    """Test error when the request fails."""
     import jwt
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
 
@@ -71,3 +78,133 @@ def test_get_installation_token_request_failure(monkeypatch):
     monkeypatch.setattr(requests, 'get', mock_get)
     with pytest.raises(requests.exceptions.HTTPError):
         github.get_installation_token('123', 'key', 'owner')
+
+
+def test_get_repo_settings_valid():
+    """Test get_repo_settings with valid configuration."""
+    package = type('Package', (), {
+        'custom': {
+            'dpetl_load': {
+                'owner': 'test',
+                'repo': 'repo',
+                'level': 'orgs',
+                'visibility': 'public'
+            }
+        }
+    })()
+
+    settings = github.get_repo_settings(package)
+    assert settings['owner'] == 'test'
+    assert settings['repo'] == 'repo'
+    assert settings['level'] == 'orgs'
+    assert settings['visibility'] == 'public'
+
+
+def test_get_repo_settings_missing_owner():
+    """Test get_repo_settings raises SystemExit when repo is set but owner is missing."""
+    package = type('Package', (), {
+        'custom': {'dpetl_load': {'repo': 'repo'}}
+    })()
+
+    with pytest.raises(SystemExit):
+        github.get_repo_settings(package)
+
+
+def test_get_repo_settings_invalid_level():
+    """Test get_repo_settings raises SystemExit for invalid level."""
+    package = type('Package', (), {
+        'custom': {'dpetl_load': {'owner': 'test', 'repo': 'repo', 'level': 'invalid'}}
+    })()
+
+    with pytest.raises(SystemExit):
+        github.get_repo_settings(package)
+
+
+def test_get_repo_settings_invalid_visibility():
+    """Test get_repo_settings raises SystemExit for invalid visibility."""
+    package = type('Package', (), {
+        'custom': {'dpetl_load': {'owner': 'test', 'repo': 'repo', 'visibility': 'invalid'}}
+    })()
+
+    with pytest.raises(SystemExit):
+        github.get_repo_settings(package)
+
+
+def test_get_remote_descriptor_not_found(monkeypatch):
+    """Test get_remote_descriptor returns None when descriptor does not exist."""
+    def mock_get(url, headers):
+        class Resp:
+            status_code = 404
+        return Resp()
+
+    monkeypatch.setattr(requests, 'get', mock_get)
+    result = github.get_remote_descriptor('owner', 'repo', 'token')
+    assert result is None
+
+
+def test_get_remote_descriptor_success(monkeypatch):
+    """Test get_remote_descriptor returns decoded content."""
+    def mock_get(url, headers):
+        class Resp:
+            status_code = 200
+
+            def json(self):
+                return {'content': base64.b64encode(b'{"resources": []}').decode()}
+
+            def raise_for_status(self):
+                pass
+        return Resp()
+
+    monkeypatch.setattr(requests, 'get', mock_get)
+    result = github.get_remote_descriptor('owner', 'repo', 'token')
+    assert result == b'{"resources": []}'
+
+
+def test_get_local_descriptor_success(monkeypatch):
+    """Test get_local_descriptor returns content when git show succeeds."""
+    def mock_run(cmd, capture_output=True):
+        class CompletedProcess:
+            returncode = 0
+            stdout = b'{"resources": []}'
+        return CompletedProcess()
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    result = github.get_local_descriptor()
+    assert result == b'{"resources": []}'
+
+
+def test_get_local_descriptor_not_found(monkeypatch):
+    """Test get_local_descriptor returns None when git show fails."""
+    def mock_run(cmd, capture_output=True):
+        class CompletedProcess:
+            returncode = 128
+            stdout = b''
+        return CompletedProcess()
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    result = github.get_local_descriptor()
+    assert result is None
+
+
+def test_get_deletions_remote(monkeypatch):
+    """Test get_deletions identifies removed resources from remote."""
+    def mock_get_remote_descriptor(*args):
+        return b'{"resources": [{"path": "old_file.csv"}, {"path": "removed_file.csv"}]}'
+
+    monkeypatch.setattr(github, 'get_remote_descriptor', mock_get_remote_descriptor)
+
+    files = {'current_file.csv': b'', 'datapackage.json': b''}
+    deletions = github.get_deletions('token', files, owner='owner', repo='repo')
+    assert deletions == {'old_file.csv', 'removed_file.csv'}
+
+
+def test_get_deletions_local(monkeypatch):
+    """Test get_deletions identifies removed resources from local."""
+    def mock_get_local_descriptor():
+        return b'{"resources": [{"path": "old_file.csv"}, {"path": "removed_file.csv"}]}'
+
+    monkeypatch.setattr(github, 'get_local_descriptor', mock_get_local_descriptor)
+
+    files = {'current_file.csv': b'', 'datapackage.json': b''}
+    deletions = github.get_deletions('token', files, owner=None, repo=None)
+    assert deletions == {'old_file.csv', 'removed_file.csv'}
