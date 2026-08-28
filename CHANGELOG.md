@@ -1,3 +1,9 @@
+## 0.14.0 (2026-08-28)
+
+### Feat
+
+- **iterator**: add enabled flag to skip extract/transform/load per package
+
 ## 0.13.0 (2026-08-28)
 
 ### Feat
