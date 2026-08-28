@@ -229,7 +229,7 @@ If `repo` is set and the repository doesn't exist, dpetl creates it automaticall
 
 Before publishing, the `dpetl_extract`, `dpetl_transform` and `dpetl_load` properties are removed from the descriptor.
 
-The transformed data folder and the package descriptor, exported as `datapackage.json`, are published in a single commit.
+A single commit publishes the transformed data and the updated `datapackage.json`, keeping the repository in sync with the current package definition.
 
 
 ## Example Data Package Configuration
