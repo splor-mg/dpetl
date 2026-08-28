@@ -42,6 +42,17 @@ def resources_iteration(package, **kwargs):
     operation = kwargs.get('operation')
     logger = logging.getLogger(f'dpetl.{operation}')
 
+    # Skip the whole operation for the package when disabled
+    config = package.custom.get(f'dpetl_{operation}', {})
+    enabled = config if isinstance(config, bool) else config.get('enabled', True)
+
+    if not enabled:
+        logger.info(
+            'Skipping %s for package %s.',
+            operation, package.name
+        )
+        return
+
     # Extract
     if operation == 'extract':
 

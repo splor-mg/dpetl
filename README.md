@@ -65,6 +65,17 @@ dpetl transform -d configs/datapackage_payroll.yaml
 dpetl extract -d datapackages/sales/datapackage.yaml -d datapackages/hr/datapackage.yaml
 ```
 
+You can **skip a command entirely for a given package** by setting `enabled: false` under the corresponding `dpetl_extract`, `dpetl_transform` or `dpetl_load` key at the package level in the descriptor.
+
+```yaml
+# full form
+dpetl_extract:
+  enabled: false
+
+# shorthand, equivalent to the above
+dpetl_extract: false
+```
+
 Environment variables for email extraction, GitHub authentication, and proxy settings can be defined in a `.env` file in the current working directory — it is loaded automatically.
 
 See the [Environment Variables](#environment-variables) section for the complete list of supported variables and their usage.
