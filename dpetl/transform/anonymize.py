@@ -30,31 +30,46 @@ def _apply_mask(pattern, value):
     """
     variants = pattern[1:-1].split('|')
 
-    # Select the mask variant based on the number of digits
+    # Fixed literal (no # or *)
+    if len(variants) == 1 and not any(c in '#*' for c in variants[0]):
+        return variants[0]
+
+    value_str = str(value)
+
+    # Select variant based on digit count (if multiple variants)
     if len(variants) > 1:
-        digit_count = sum(c.isdigit() for c in str(value))
+        digit_count = sum(c.isdigit() for c in value_str)
         by_count = {sum(1 for c in v if c in '#*'): v for v in variants}
         variant = by_count.get(digit_count)
         if variant is None:
-            return value
+            return value_str
     else:
         variant = variants[0]
 
-    # Apply the selected mask to the original value
-    digits = iter(c for c in str(value) if c.isdigit())
+    # Check if there are literals in the pattern
+    has_literals = any(c not in '#*' for c in variant)
+
+    if has_literals:
+        # Process only digits, keep literals
+        source = iter(c for c in value_str if c.isdigit())
+    else:
+        # Process all characters
+        source = iter(value_str)
+
     result = []
     for p in variant:
         if p in '#*':
-            c = next(digits, None)
+            c = next(source, None)
             if c is None:
                 break
             result.append(c if p == '#' else '*')
         else:
             result.append(p)
+
     return ''.join(result)
 
 
-def apply_anonymization(field, table, secret_key):
+def apply_anonymization(field, table, secret_key, target=None):
     """
     Apply anonymization transforms for fields that declare an `anonymize` property.
     """
@@ -64,6 +79,8 @@ def apply_anonymization(field, table, secret_key):
 
     method = config.get('method')
     missing_set = set(field.missing_values)
+    condition = config.get('filter')
+    header = table.header()
 
     # Apply mask-based anonymization
     if method.startswith('[') and method.endswith(']'):
@@ -108,11 +125,20 @@ def apply_anonymization(field, table, secret_key):
 
     # Keep configured missing values unchanged
     def converter(value, row):
-        return value if value in missing_set else transform(value, row)
+        if value in missing_set:
+            return value
+        if condition:
+            namespace = dict(zip(header, row))
+            try:
+                matches = eval(condition, {}, namespace)
+            except Exception:
+                return value
+            if not matches:
+                return value
+        return transform(value, row)
 
     logger.debug('Anonymizing field "%s" using method "%s".', field.name, method)
-
-    return etl.convert(table, field.name, converter, pass_row=True)
+    return etl.convert(table, target or field.name, converter, pass_row=True)
 
 
 def build_constraints(field):
@@ -129,6 +155,9 @@ def build_constraints(field):
     if method.startswith('[') and method.endswith(']'):
         parts = []
         for variant in method[1:-1].split('|'):
+            if not any(c in '#*' for c in variant):
+                parts.append(re.escape(variant))
+                continue
             if all(c in '#*' for c in variant):
                 parts.append(r'[^*].*')
                 continue
@@ -163,4 +192,14 @@ def build_constraints(field):
             parts = [token]
 
     pattern_str = '|'.join(parts)
+
+    # With a filter, non-matching rows keep their original format
+    if config.get('filter'):
+        original_pattern = (field.constraints or {}).get('pattern')
+        if original_pattern:
+            combined = f'{original_pattern.strip("^$")}|{pattern_str}'
+            return {'pattern': f'^({combined})$'}
+        else:
+            return {}
+
     return {'pattern': f'^({pattern_str})$' if len(parts) > 1 else f'^{pattern_str}$'}
