@@ -190,15 +190,14 @@ Supported `method` values:
 - `aes_siv`: deterministic encryption (AES-SIV) – requires `ANONYMIZE_SECRET_KEY`.
   - `context`: optional **context tweak** – uses another field's value as a cryptographic context, so identical values in different contexts produce different tokens.
   - `annotation`: optional **surrogate annotation** – a human‑readable prefix prepended to the encrypted value.
+  - `ANONYMIZE_SECRET_KEY`: to generate a secret key for AES‑SIV, use `dpetl transform keygen`
 
 - `[pattern]`: mask pattern, e.g. `[###-###]` or `[###-###|####-####]`.
   - `#` preserves the original digit.
   - `*` masks the digit (replaces with `*`).
   - Other characters are literals.
 
-To generate a secret key for AES‑SIV, use: `dpetl transform keygen`
-
-After transformation, any `anonymize` properties are removed from the field metadata.
+You can also add a `filter` condition (a Python expression) to control which rows are anonymized.
 
 > **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
 
@@ -285,16 +284,16 @@ resources:
         - python scripts/clean_data.py data/external_data.csv
 
   # Example 4: Static resource with column renaming
-  - name: employees
-    path: data/employees.csv
+  - name: customers
+    path: data/customers.csv
     schema:
       fields:
         - name: Name
           type: string
-          target: employee_name
-        - name: Department
+          target: customer_name
+        - name: Region
           type: string
-          target: employee_department
+          target: customer_region
     dpetl_transform:
       format: csv.gz   # optional (Defaults to csv.gz)
       path: data/processed   # optional (Defaults to data)
@@ -302,23 +301,25 @@ resources:
       delimiter: ';'   # optional (Defaults to ,)
 
 # Example 5: Anonymization of sensitive fields
-- name: customers
-  path: data/customers.csv
+- name: employees
+  path: data/employees.csv
   schema:
     fields:
-      - name: name
+      - name: employee_name
         type: string
-        target: customer_name
+        target: name_hashed
         custom:
           anonymize:
             method: '[#***]'
-      - name: cpf
+      - name: tax_id
         type: string
+        target: tax_id_encrypted
         custom:
           anonymize:
             method: aes_siv
-            context: ano
-            annotation: CPF:11|CNPJ:14
+            context: department
+            annotation: TAX:11
+            filter: 'department == "Finance"'
       - name: phone
         type: string
         custom:

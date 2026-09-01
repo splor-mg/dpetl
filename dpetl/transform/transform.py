@@ -36,13 +36,13 @@ def transform_package(package, **kwargs):
         # Apply transformation functions to a field
         table = resource.to_petl()
         for field in resource.schema.fields:
-            # Anonymize field
-            table = anonymize.apply_anonymization(field, table, secret_key)
-
             # Rename fields based on target names
             target = field.custom.get('target')
             if target:
                 table = etl.rename(table, field.name, target)
+
+            # Anonymize field
+            table = anonymize.apply_anonymization(field, table, secret_key, target)
 
         # Export the transformed data
         datapackage.write_files(package, resource, table, **settings)
