@@ -90,10 +90,13 @@ Runs the ETL extraction phase. Downloads data from external sources (API, email)
 dpetl extract
 
 # Extract emails received today only
-dpetl extract --today-email
+dpetl extract --today-email   # or -t
 
 # Include package name in email subject search pattern
-dpetl extract --add-package-name
+dpetl extract --add-package-name   # or -a
+
+# Add a delay between resource extractions (in seconds)
+dpetl extract --delay 5   # or -d 5
 ```
 
 Each resource in the descriptor must declare an extraction `mode` (`email` or `api`) inside its `dpetl_extract` property (see [Example Data Package Configuration](#example-data-package-configuration)). If a resource is missing this property, the whole package extraction stops immediately.

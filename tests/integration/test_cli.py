@@ -77,6 +77,17 @@ def test_extract_default_descriptor(mock_descriptor_iteration):
     assert kwargs.get('descriptor') is None
     assert kwargs['today_email'] is False
     assert kwargs['add_package_name'] is False
+    assert kwargs['delay'] == 0
+
+
+def test_extract_delay_with_value(mock_descriptor_iteration):
+    """
+    --delay 10 should pass delay=10.
+    """
+    result = runner.invoke(app, ['extract', '--delay', '10'], obj={'no_validate': True, 'no_stop': True})
+    assert result.exit_code == 0
+    kwargs = mock_descriptor_iteration[0]
+    assert kwargs['delay'] == 10
 
 
 # Version flag test ------------------------------------------------------------

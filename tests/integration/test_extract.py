@@ -32,7 +32,6 @@ class MockMailBox:
         pass
 
     def fetch(self, criteria, limit, reverse):
-        # Create a dummy message with a single attachment
         class Msg:
             subject = 'test'
             date = '2026-07-16'
@@ -41,70 +40,99 @@ class MockMailBox:
         return [Msg()]
 
 
+# Helper para criar recursos falsos --------------------------------------------
+def make_fake_resource(mode, name="test_resource", custom_extra=None):
+    custom = {'dpetl_extract': {'mode': mode}} if mode is not None else {}
+    if custom_extra:
+        custom['dpetl_extract'].update(custom_extra)
+    return type('FakeResource', (), {
+        'name': name,
+        'custom': custom,
+        'extrapaths': []
+    })
+
+
+def make_fake_package(resources):
+    return type('FakePackage', (), {'resources': resources})()
+
+
 # Tests for extract_package (dispatcher) ---------------------------------------
-def test_extract_package_email_mode(fake_package, monkeypatch):
+def test_extract_package_missing_mode(caplog):
+    """When resource has no dpetl_extract.mode, log error and return."""
+    resource = make_fake_resource(None)  # custom fica vazio
+    package = make_fake_package([resource])
+    extract.extract_package(package, no_stop=True, no_validate=True)
+    assert 'Missing required dpetl_extract.mode' in caplog.text
+
+
+@pytest.mark.parametrize("mode, mock_path, expected", [
+    ("email", "dpetl.extract.email.email_connection", "test_resource"),
+    ("api", "dpetl.extract.api.check_multipart_files", ("api", "test_resource")),
+    ("cli", "dpetl.extract.command.check_cli_commands", ("cli", "test_resource")),
+])
+def test_extract_package_modes(monkeypatch, mode, mock_path, expected):
     """
-    Verify that extract_package calls email_connection when mode is 'email'.
+    Test that extract_package dispatches to the correct extractor based on mode.
     """
     calls = []
+
+    def fake_func(resource, **kwargs):
+        if mode == "email":
+            calls.append(resource.name)
+        else:
+            calls.append((mode, resource.name))
+
+    monkeypatch.setattr(mock_path, fake_func)
+
+    resource = make_fake_resource(mode)
+    package = make_fake_package([resource])
+
+    extract.extract_package(package, no_stop=True, no_validate=True)
+    assert calls == [expected]
+
+
+def test_extract_package_with_delay(monkeypatch):
+    """When delay > 0, time.sleep should be called with that value."""
+    sleep_calls = []
+
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr('dpetl.extract.extract.time.sleep', fake_sleep)
+    monkeypatch.setattr('dpetl.extract.extract.validate.check_resource', lambda *args, **kwargs: True)
+
+    resource = make_fake_resource("email")
+    package = make_fake_package([resource])
 
     def fake_email_connection(resource, **kwargs):
-        calls.append(resource.name)
-
+        pass
     monkeypatch.setattr('dpetl.extract.email.email_connection', fake_email_connection)
 
-    from dpetl.extract import extract
-    extract.extract_package(fake_package, no_stop=True, no_validate=True)
-
-    assert calls == ['test_resource']
+    extract.extract_package(package, delay=2, no_stop=True, no_validate=True)
+    assert sleep_calls == [2]
 
 
-def test_extract_package_api_mode(monkeypatch):
+def test_extract_package_validation_failure_breaks_loop(monkeypatch):
     """
-    Verify that extract_package calls check_multipart_files when mode is 'api'.
+    When validate.check_resource returns False, the loop breaks and sleep is not called.
     """
-    calls = []
+    sleep_calls = []
 
-    def fake_api(resource, **kwargs):
-        calls.append(('api', resource.name))
+    def fake_sleep(seconds):
+        sleep_calls.append(seconds)
 
-    monkeypatch.setattr('dpetl.extract.api.check_multipart_files', fake_api)
+    monkeypatch.setattr('dpetl.extract.extract.time.sleep', fake_sleep)
+    monkeypatch.setattr('dpetl.extract.extract.validate.check_resource', lambda *args, **kwargs: False)
 
-    # Minimal resource and package with mode='api'
-    class FakeResource:
-        name = 'test_resource'
-        custom = {'dpetl_extract': {'mode': 'api'}}
-        extrapaths = []
+    resource = make_fake_resource("email")
+    package = make_fake_package([resource])
 
-    class FakePackage:
-        resources = [FakeResource()]
+    def fake_email_connection(resource, **kwargs):
+        pass
+    monkeypatch.setattr('dpetl.extract.email.email_connection', fake_email_connection)
 
-    extract.extract_package(FakePackage(), no_stop=True, no_validate=True)
-
-    assert calls == [('api', 'test_resource')]
-
-
-def test_extract_package_cli_mode(monkeypatch):
-    """Verify that extract_package calls check_cli_commands when mode is 'cli'."""
-    calls = []
-
-    def fake_cli_command(resource, **kwargs):
-        calls.append(('cli', resource.name))
-
-    monkeypatch.setattr('dpetl.extract.command.check_cli_commands', fake_cli_command)
-
-    class FakeResource:
-        name = 'test_resource'
-        custom = {'dpetl_extract': {'mode': 'cli'}}
-        extrapaths = []
-
-    class FakePackage:
-        resources = [FakeResource()]
-
-    from dpetl.extract import extract
-    extract.extract_package(FakePackage(), no_stop=True, no_validate=True)
-
-    assert calls == [('cli', 'test_resource')]
+    extract.extract_package(package, delay=2, no_stop=True, no_validate=True)
+    assert sleep_calls == []
 
 
 # Tests for email_connection (direct) ------------------------------------------
@@ -125,21 +153,15 @@ def test_email_connection_missing_env(monkeypatch, caplog):
 
 
 def test_email_connection_success(monkeypatch, tmp_path):
-    """
-    Test successful email connection and attachment saving.
-    """
+    """Test successful email connection and attachment saving."""
     monkeypatch.setenv('EMAIL_USER', 'user')
     monkeypatch.setenv('EMAIL_PWD', 'pass')
     monkeypatch.setenv('EMAIL_IMAP', 'imap.host')
 
-    # Disable proxy configuration to avoid side effects
     monkeypatch.setattr('dpetl.extract.email.configure_proxy_from_env', lambda: None)
-
-    # Apply MailBox mock globally
     monkeypatch.setattr('imap_tools.MailBox', MockMailBox)
     monkeypatch.setattr('dpetl.extract.email.MailBox', MockMailBox)
 
-    # Create a minimal resource with 'name'
     resource = type('Resource', (), {
         'name': 'test_resource',
         'custom': {'dpetl_extract': {'criteria': {'subject': 'test'}}},
@@ -148,10 +170,7 @@ def test_email_connection_success(monkeypatch, tmp_path):
         'package': type('Package', (), {'name': 'pkg', '_basepath': str(tmp_path)})()
     })()
 
-    from dpetl.extract import email
     email.email_connection(resource)
-
-    # Verify file was created
     saved_file = tmp_path / 'output/file.csv'
     assert saved_file.exists()
     assert saved_file.read_bytes() == b'content'
@@ -159,19 +178,15 @@ def test_email_connection_success(monkeypatch, tmp_path):
 
 def test_email_connection_with_extrapaths(monkeypatch, tmp_path):
     """
-    Test email connection when resource has extrapaths.
-    Should save attachment to both main path and each extrapath.
+    Test email connection with extrapaths - saves to both main and extra paths.
     """
     monkeypatch.setenv('EMAIL_USER', 'user')
     monkeypatch.setenv('EMAIL_PWD', 'pass')
     monkeypatch.setenv('EMAIL_IMAP', 'imap.host')
     monkeypatch.setattr('dpetl.extract.email.configure_proxy_from_env', lambda: None)
-
-    # Use the same MailBox mock
     monkeypatch.setattr('imap_tools.MailBox', MockMailBox)
     monkeypatch.setattr('dpetl.extract.email.MailBox', MockMailBox)
 
-    # Create resource with 'name' and extrapaths
     resource = type('Resource', (), {
         'name': 'test_resource',
         'custom': {'dpetl_extract': {'criteria': {'subject': 'test'}}},
@@ -180,10 +195,7 @@ def test_email_connection_with_extrapaths(monkeypatch, tmp_path):
         'package': type('Package', (), {'name': 'pkg', '_basepath': str(tmp_path)})()
     })()
 
-    from dpetl.extract import email
     email.email_connection(resource)
-
-    # Both files should exist
     assert (tmp_path / 'output/file.csv').exists()
     assert (tmp_path / 'output/extra.csv').exists()
 
@@ -193,7 +205,6 @@ def test_check_multipart_files(monkeypatch, tmp_path):
     """
     Test check_multipart_files: downloads from API and saves to path and extrapaths.
     """
-    # Mock requests.get to return dummy content
     class MockResponse:
         def __init__(self, content):
             self.content = content
@@ -210,7 +221,6 @@ def test_check_multipart_files(monkeypatch, tmp_path):
 
     monkeypatch.setattr(requests, 'get', mock_get)
 
-    # Create resource with paths inside tmp_path
     resource = type('Resource', (), {
         'name': 'test',
         'path': str(tmp_path / 'data/file.csv'),
@@ -218,12 +228,9 @@ def test_check_multipart_files(monkeypatch, tmp_path):
         'extrapaths': [str(tmp_path / 'data/file2.csv')]
     })()
 
-    # Ensure the parent directory exists
     (tmp_path / 'data').mkdir(parents=True, exist_ok=True)
-
     api.check_multipart_files(resource, no_validate=True)
 
-    # Both files should be created
     assert (tmp_path / 'data/file.csv').exists()
     assert (tmp_path / 'data/file2.csv').exists()
 
@@ -251,11 +258,10 @@ def test_check_cli_commands_missing_arguments(caplog):
     """Test that check_cli_commands logs an error when arguments are missing."""
     resource = type('Resource', (), {
         'name': 'test',
-        'custom': {'dpetl_extract': {}}  # sem 'arguments'
+        'custom': {'dpetl_extract': {}}
     })()
 
     command.check_cli_commands(resource)
-
     assert 'Missing required dpetl_extract.arguments' in caplog.text
 
 
@@ -277,7 +283,6 @@ def test_check_cli_commands_success(monkeypatch, caplog):
         return type('CompletedProcess', (), {'returncode': 0})()
 
     monkeypatch.setattr(subprocess, 'run', mock_run)
-
     command.check_cli_commands(resource)
 
     assert 'Running command' in caplog.text
@@ -292,7 +297,6 @@ def test_run_cli_command_called_process_error(monkeypatch, caplog):
         raise subprocess.CalledProcessError(1, cmd)
 
     monkeypatch.setattr(subprocess, 'run', mock_run)
-
     command.run_cli_command('false', resource)
 
     assert 'CLI command failed for resource test:' in caplog.text
@@ -307,6 +311,6 @@ def test_run_cli_command_file_not_found(monkeypatch, caplog):
         raise FileNotFoundError("No such file: 'nonexistent'")
 
     monkeypatch.setattr(subprocess, 'run', mock_run)
-
     command.run_cli_command('nonexistent', resource)
+
     assert "CLI command not found for resource test: No such file: 'nonexistent'" in caplog.text
