@@ -1,4 +1,5 @@
 import logging
+import time
 
 from dpetl.extract import api, command, email
 from dpetl.helpers import validate
@@ -12,6 +13,7 @@ def extract_package(package, **kwargs):
     """
     rows = []
     errors = []
+    delay = kwargs.get('delay', 0)
 
     for resource in package.resources:
         # Get extraction mode from resource custom metadata
@@ -37,10 +39,12 @@ def extract_package(package, **kwargs):
             api.check_multipart_files(resource, **kwargs)
         elif mode == 'cli':
             command.check_cli_commands(resource, **kwargs)
-            
+
         # Check if the extracted data is valid
         if not validate.check_resource(resource, rows, errors, **kwargs):
             break
+
+        time.sleep(delay)
 
     # Display validation results and exit if there were errors
     validate.validate_resources(rows, errors, **kwargs)

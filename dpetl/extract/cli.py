@@ -21,10 +21,22 @@ def extract(
             '{package_name}_{resource_name} instead of just {resource_name}.'
         ),
     ),
+
+    delay: int = typer.Option(
+        0,
+        '--delay', '-d',
+        help=(
+            'Delay in seconds between resource extractions. '
+            'Use `--delay <seconds>`.'
+        ),
+    ),
 ):
     """
     Simplified some ETL extract operations.
     """
-    iterator.descriptor_iteration(operation='extract', **ctx.obj,
-                                  today_email=today_email,
-                                  add_package_name=add_package_name)
+    iterator.descriptor_iteration(
+        operation='extract', **ctx.obj,
+        today_email=today_email,
+        add_package_name=add_package_name,
+        delay=delay
+    )
