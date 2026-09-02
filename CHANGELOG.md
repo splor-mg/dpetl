@@ -1,3 +1,10 @@
+## 0.16.0 (2026-09-02)
+
+### Feat
+
+- **pyproject.toml**: add openpyxl to dev dependencies for XLSX tests
+- **extract**: add --delay option to control pause between resources
+
 ## 0.15.0 (2026-09-01)
 
 ### Feat
