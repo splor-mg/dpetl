@@ -201,9 +201,14 @@ def test_repo_exists(monkeypatch, status_code, expected):
 
 
 # Tests for github.create_repo -------------------------------------------------
-def test_create_repo(monkeypatch):
-    """Test create_repo sends correct payload."""
+@pytest.mark.parametrize('level, expected_url', [
+    ('user', 'https://api.github.com/user/repos'),
+    ('orgs', 'https://api.github.com/orgs/owner/repos'),
+])
+def test_create_repo(monkeypatch, level, expected_url):
+    """Test create_repo sends correct payload and uses correct endpoint."""
     payload = None
+    captured_url = None
 
     class MockResponse:
         def __init__(self):
@@ -217,14 +222,16 @@ def test_create_repo(monkeypatch):
             return {}
 
     def mock_post(url, json, headers):
-        nonlocal payload
+        nonlocal payload, captured_url
         payload = json
+        captured_url = url
         return MockResponse()
 
     monkeypatch.setattr(requests, 'post', mock_post)
 
-    github.create_repo('token', 'owner', 'repo', 'user', 'private')
+    github.create_repo('token', 'owner', 'repo', level, 'private')
 
+    assert captured_url == expected_url
     assert payload['name'] == 'repo'
     assert payload['private'] is True
 
