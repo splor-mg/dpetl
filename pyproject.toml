@@ -4,7 +4,7 @@ build-backend = 'poetry.core.masonry.api'
 
 [project]
 name = 'dpetl'
-version = "0.15.0"
+version = '0.15.0'
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
@@ -17,13 +17,13 @@ dependencies = [
     'imap-tools (>=1.11.1,<2.0.0)',
     'frictionless[pandas] (>=5.18.1,<6.0.0)',
     'pysocks (>=1.7.1,<2.0.0)',
-    "tqdm (>=4.67.3,<5.0.0)"
+    'tqdm (>=4.67.3,<5.0.0)'
 ]
 
 [project.optional-dependencies]
 github-app = [
-    "PyJWT>=2.0.0",
-    "cryptography>=3.4.0"
+    'PyJWT>=2.0.0',
+    'cryptography>=3.4.0'
 ]
 
 [project.urls]
@@ -50,9 +50,10 @@ dev = [
     'pytest (>=9.0.2,<10.0.0)',
     'pytest-cov (>=7.0.0,<8.0.0)',
     'ruff (>=0.14.10,<0.15.0)',
-    "coverage-badge (>=1.1.2,<2.0.0)",
-    "setuptools (<81)",
-    "commitizen (>=4.17.0,<5.0.0)"
+    'openpyxl (>=3.0.0)',
+    'coverage-badge (>=1.1.2,<2.0.0)',
+    'setuptools (<81)',
+    'commitizen (>=4.17.0,<5.0.0)'
 ]
 
 [tool.poetry]
