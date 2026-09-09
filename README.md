@@ -311,23 +311,20 @@ resources:
       - name: employee_name
         type: string
         target: name_hashed
-        custom:
-          anonymize:
-            method: '[#***]'
+        anonymize:
+          method: '[#***]'
       - name: tax_id
         type: string
         target: tax_id_encrypted
-        custom:
-          anonymize:
-            method: aes_siv
-            context: department
-            annotation: TAX:11
-            filter: 'department == "Finance"'
+        anonymize:
+          method: aes_siv
+          context: department
+          annotation: TAX:11
+          filter: 'department == "Finance"'
       - name: phone
         type: string
-        custom:
-          anonymize:
-            method: '[###-***-####]'
+        anonymize:
+          method: '[###-***-####]'
 
 # Load configuration (defined once per package)
 dpetl_load:
