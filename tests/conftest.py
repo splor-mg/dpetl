@@ -1,7 +1,9 @@
 """
 Pytest configuration file with shared fixtures for all tests.
 """
+import shutil
 import pytest
+from pathlib import Path
 from frictionless import Package, Resource
 from typer.testing import CliRunner
 
@@ -10,18 +12,14 @@ import dpetl.helpers.iterator
 
 @pytest.fixture
 def runner():
-    """
-    Provides a CliRunner instance for testing Typer CLI commands.
-    Usage: runner.invoke(app, ['command', '--flag'])
-    """
+    """Provides a CliRunner instance for testing Typer CLI commands."""
     return CliRunner()
 
 
 @pytest.fixture
 def mock_descriptor_iteration(monkeypatch):
     """
-    Mocks the descriptor_iteration function to avoid real execution.
-    Captures all calls with their arguments for assertion in tests.
+    Monkeypatches descriptor_iteration, capturing all call args for assertions.
     """
     calls = []
 
@@ -33,10 +31,7 @@ def mock_descriptor_iteration(monkeypatch):
 
 @pytest.fixture
 def fake_package():
-    """
-    Creates a minimal frictionless Package with one Resource.
-    The resource has custom.dpetl_extract.mode = 'email' for testing email extraction.
-    """
+    """Minimal Package with one Resource set to email extraction mode."""
     resource = Resource.from_descriptor({
         'name': 'test_resource',
         'path': 'data/test.csv',
@@ -48,3 +43,28 @@ def fake_package():
         resource.custom = resource.custom['custom']
 
     return Package(resources=[resource], basepath='/tmp')
+
+
+@pytest.fixture
+def dpetl_package(tmp_path):
+    """
+    Copies the test datapackage fixture to a temp dir and loads it,
+    enabling safe read/write operations without affecting the source.
+    """
+    source = Path(__file__).parent / 'datapackage'
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True)
+    return Package(str(tmp_path / 'datapackage.yaml'))
+
+
+@pytest.fixture
+def scoped_package():
+    """
+    Factory that builds a Package with selected resources from another package,
+    preserving top-level custom metadata, for isolated resource testing.
+    """
+    def _scoped(package, *names):
+        resources = [package.get_resource(name) for name in names]
+        scoped = Package(resources=resources, basepath=package._basepath)
+        scoped.custom.update(package.custom)
+        return scoped
+    return _scoped
