@@ -69,7 +69,7 @@ def _apply_mask(pattern, value):
     return ''.join(result)
 
 
-def apply_anonymization(field, table, secret_key, target=None):
+def apply_anonymization(field, table, secret_key):
     """
     Apply anonymization transforms for fields that declare an `anonymize` property.
     """
@@ -138,7 +138,7 @@ def apply_anonymization(field, table, secret_key, target=None):
         return transform(value, row)
 
     logger.debug('Anonymizing field "%s" using method "%s".', field.name, method)
-    return etl.convert(table, target or field.name, converter, pass_row=True)
+    return etl.convert(table, field.name, converter, pass_row=True)
 
 
 def build_constraints(field):
