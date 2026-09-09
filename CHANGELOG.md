@@ -1,3 +1,13 @@
+## 0.17.0 (2026-09-09)
+
+### Feat
+
+- **transform**: add dpetl_transform.cli to run an external commands
+
+### Fix
+
+- **transform**: drop unused target param from apply_anonymization
+
 ## 0.16.0 (2026-09-02)
 
 ### Feat
