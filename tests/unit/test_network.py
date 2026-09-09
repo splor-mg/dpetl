@@ -9,16 +9,16 @@ from dpetl.helpers import network
 
 # Tests for force_ipv4 ---------------------------------------------------------
 def test_force_ipv4(monkeypatch):
-    """Test that force_ipv4 replaces getaddrinfo with a wrapper."""
-    original = socket.getaddrinfo
+    """force_ipv4 replaces socket.getaddrinfo with a wrapper function."""
+    monkeypatch.setattr(socket, 'getaddrinfo', socket.getaddrinfo)  # let monkeypatch restore it after
+
     network.force_ipv4()
+
     assert socket.getaddrinfo.__name__ == 'getaddrinfo_ipv4'
-    socket.getaddrinfo = original
 
 
 def test_force_ipv4_wrapper_uses_af_inet(monkeypatch):
-    """Test that the wrapper calls the original with AF_INET."""
-    original = socket.getaddrinfo
+    """The wrapper always calls the original getaddrinfo with family=AF_INET."""
     called_with_family = []
 
     def fake_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
@@ -28,7 +28,7 @@ def test_force_ipv4_wrapper_uses_af_inet(monkeypatch):
     monkeypatch.setattr(socket, 'getaddrinfo', fake_getaddrinfo)
     network.force_ipv4()
     socket.getaddrinfo('localhost', 80)
-    socket.getaddrinfo = original
+
     assert called_with_family == [socket.AF_INET]
 
 
