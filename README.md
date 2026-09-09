@@ -160,7 +160,13 @@ dpetl transform keygen
 
 ### Resource properties
 
-Reads the transformation settings from the resource's `dpetl_transform` property:
+Each resource can be exported using dpetl's built-in pipeline, an external command, or both. When both are used, the command runs after the pipeline, so it can further modify the file dpetl has already written.
+
+After transformation, each resource becomes a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
+
+#### Output settings (for the built‑in pipeline)
+
+These are read from the resource's dpetl_transform property:
 
 - `path`: optional (defaults to `data`). Folder where the transformed file is saved.
 
@@ -172,7 +178,17 @@ Reads the transformation settings from the resource's `dpetl_transform` property
 
 - `delimiter`: optional (defaults to `,`). Field separator used for `csv`/`txt` files.
 
-Once all resources are transformed, each resource is converted to a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
+#### `cli`
+
+Runs shell commands as a complement to or replacement for the built‑in pipeline:
+
+- `arguments`: list of commands, executed in order.
+
+- `path`: optional (defaults to `dpetl_transform.path`). Directory where the command's output is expected.
+
+- `pre_process`: optional (defaults to `true`). If `true`, the built‑in pipeline runs first and the command should (over)write that same file. If false, the built‑in pipeline is skipped and the command alone produces the output file.
+
+The cli's output must be a file named after the resource (case‑insensitive match). Its `format`, `encoding` and `schema` are inferred directly from that file – not from the settings above.
 
 ### Field properties
 
