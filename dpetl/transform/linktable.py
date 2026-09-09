@@ -1,0 +1,94 @@
+import pandas as pd
+from frictionless import Package
+from pathlib import Path
+
+def create_fact_tables(resource):
+
+    # Get dimensions and facts
+    dimensions = [
+        field.name
+        for field in resource.schema.fields
+        if not field.name.startswith('vlr_')
+    ]
+
+    facts = [
+        field.name
+        for field in resource.schema.fields
+        if field.name.startswith('vlr_')
+    ]
+
+    # Create linktable directory if it doen´t exists
+    Path('data/linktable').mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # Append dimensions to the package_dimentions dictionary to create the linktable later
+    package_dimensions[resource.name] = dimensions
+
+    # Read the resource as pd DataFrame
+    print(f'Processing {resource.name}')
+    df = resource.to_pandas()
+
+    # Append the resource dataframe to the resource_dfs list, dropping the facts and duplicates
+    resource_dfs.append(
+        df.copy()
+        .drop(columns=facts)
+        .drop_duplicates()
+    )
+
+    # Create key
+    key = (
+        df[dimensions]
+        .astype('string')
+        .fillna('')
+        .agg('|'.join, axis=1)
+    )
+
+    # Remove dimensions and append key collumn on fact tables
+    df = df.drop(columns=dimensions)
+    df.insert(0, f'key_{resource.name}', key)
+
+    # Rewrite fact table
+    print(
+        f'Writing {resource.name} '
+        f'to data/linktable/fact_{resource.name}.csv.gz'
+    )
+
+    df.to_csv( # usar o load
+        f'data/linktable/fact_{resource.name}.csv.gz',
+        index=False
+    )
+
+    return package_dimensions, resource_dfs
+
+
+def create_linktable(package_dimensions, resource_dfs):
+    # create a combined dataframe with all the dimentions from all the resources, dropping duplicates
+    combined_df = pd.concat(
+        resource_dfs,
+        ignore_index=True
+    )
+
+    # Create key
+    for resource_name, dimensions in package_dimensions.items():
+        print(f'Writing {resource_name} to linktable')
+
+        key = (
+            combined_df[dimensions]
+            .astype('string')
+            .fillna('')
+            .agg('|'.join, axis=1)
+        )
+
+        combined_df.insert(
+            0,
+            f'key_{resource_name}',
+            key
+        )
+
+    # Write linktable
+    combined_df.to_csv(
+        'data/linktable.csv.gz',
+        index=False
+    )

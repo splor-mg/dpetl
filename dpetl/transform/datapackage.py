@@ -25,6 +25,7 @@ def get_output_settings(resource):
         'delimiter': dpetl.get('delimiter') or ',',
         'cli': dpetl.get('cli'),
         'pre_process': cli.get('pre_process', True),
+        'linktable':dpetl.get('linktable', False)
     }
 
 

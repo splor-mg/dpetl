@@ -3,11 +3,13 @@ import logging
 import petl as etl
 from dotenv import load_dotenv, find_dotenv
 
+from dpetl.linktable import create_fact_tables, create_linktable
 from dpetl.transform import anonymize, command, datapackage
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
-
+package_dimensions = {}
+resource_dfs = []
 
 def transform_package(package, **kwargs):
     """
@@ -46,6 +48,12 @@ def transform_package(package, **kwargs):
                 # Anonymize field
                 table = anonymize.apply_anonymization(field, table, secret_key)
 
+        if settings['linktable']:
+            dimensions, resource_df = create_fact_tables(resource)
+
+            package_dimensions[resource.name] = dimensions
+            resource_dfs.append(resource_df)
+
             # Export the transformed data
             datapackage.write_files(package, resource, table, **settings)
 
@@ -59,6 +67,9 @@ def transform_package(package, **kwargs):
         # Validate the processed resource
         if not validate.check_resource(resource, rows, errors, **kwargs):
             break
+
+    if resource_dfs:
+        create_linktable(package_dimensions, resource_dfs)
 
     # Display validation results
     validate.validate_resources(rows, errors, **kwargs)
