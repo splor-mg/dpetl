@@ -3,7 +3,7 @@ import logging
 import petl as etl
 from dotenv import load_dotenv, find_dotenv
 
-from dpetl.transform import datapackage, anonymize
+from dpetl.transform import anonymize, command, datapackage
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
@@ -34,18 +34,24 @@ def transform_package(package, **kwargs):
         settings = datapackage.get_output_settings(resource)
 
         # Apply transformation functions to a field
-        table = resource.to_petl()
-        for field in resource.schema.fields:
-            # Rename fields based on target names
-            target = field.custom.get('target')
-            if target:
-                table = etl.rename(table, field.name, target)
+        if settings['pre_process']:
+            table = resource.to_petl()
+            for field in resource.schema.fields:
+                # Rename fields based on target names
+                target = field.custom.get('target')
+                if target:
+                    table = etl.rename(table, field.name, target)
+                    field.name = target
 
-            # Anonymize field
-            table = anonymize.apply_anonymization(field, table, secret_key, target)
+                # Anonymize field
+                table = anonymize.apply_anonymization(field, table, secret_key)
 
-        # Export the transformed data
-        datapackage.write_files(package, resource, table, **settings)
+            # Export the transformed data
+            datapackage.write_files(package, resource, table, **settings)
+
+        # Run an external transformation script
+        if settings['cli']:
+            command.check_cli_commands(resource, **kwargs)
 
         # Update resource metadata after transformation
         datapackage.update_metadata(resource, **settings)

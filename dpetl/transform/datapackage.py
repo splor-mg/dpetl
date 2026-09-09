@@ -1,7 +1,7 @@
 import petl as etl
 from pathlib import Path
 from datetime import datetime
-from frictionless import Dialect
+from frictionless import Dialect, Resource
 
 from dpetl.transform import anonymize
 
@@ -11,6 +11,7 @@ def get_output_settings(resource):
     Extract output settings from the resource custom metadata.
     """
     dpetl = resource.custom.get('dpetl_transform', {})
+    cli = dpetl.get('cli') or {}
     parts = (dpetl.get('format') or 'csv.gz').split('.')
     format = parts[0]
     compression = parts[1] if len(parts) > 1 else None
@@ -22,6 +23,8 @@ def get_output_settings(resource):
         'extension': f'{format}.{compression}' if compression else format,
         'encoding': dpetl.get('encoding') or 'utf-8',
         'delimiter': dpetl.get('delimiter') or ',',
+        'cli': dpetl.get('cli'),
+        'pre_process': cli.get('pre_process', True),
     }
 
 
@@ -44,25 +47,50 @@ def write_files(package, resource, table, path, format, extension, encoding, del
         raise ValueError(f'Unsupported format: {format}')
 
 
-def update_metadata(resource, path, format, compression, extension, delimiter, **kwargs):
+def update_metadata(resource, path, format, compression, extension, delimiter, cli, **kwargs):
     """
     Update resource metadata after transformation to match the generated output file.
     """
-    schema = resource.schema.fields
+    if cli:
+        basepath = resource.package._basepath
+        directory = Path(basepath) / (cli.get('path') or path)
 
-    # Update file-related resource properties
-    resource.path = f'{path}/{resource.name}.{extension}'
-    resource.scheme = 'file'
-    resource.format = format
-    resource.compression = compression
-    resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
+        for output in directory.iterdir():
+            if output.is_file() and output.stem.lower() == resource.name:
+                break
+
+        relative_path = str(output.relative_to(basepath))
+
+        def infer(**options):
+            inferred = Resource(path=relative_path, basepath=basepath, **options)
+            inferred.infer(stats=True)
+            return inferred
+
+        inferred = infer()
+        if inferred.type != 'table':
+            inferred = infer(format=format)
+
+        resource.path = inferred.path
+        resource.scheme = inferred.scheme
+        resource.format = inferred.format
+        resource.compression = inferred.compression
+        resource.encoding = inferred.encoding
+        resource.dialect = inferred.dialect
+        resource.schema = inferred.schema
+        resource.stats = inferred.stats
+
+    else:
+        # Update file-related resource properties
+        resource.path = f'{path}/{resource.name}.{extension}'
+        resource.scheme = 'file'
+        resource.format = format
+        resource.compression = compression
+        resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
 
     # Update field properties
+    schema = resource.schema.fields
     for index, field in enumerate(schema):
-        target = field.custom.get('target')
-
         schema[index] = field.to_copy(
-            name=target or field.name,
             constraints=anonymize.build_constraints(field),
         )
 
