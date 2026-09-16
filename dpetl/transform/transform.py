@@ -2,12 +2,14 @@ import os
 import logging
 import petl as etl
 from dotenv import load_dotenv, find_dotenv
+from pathlib import Path
 
 from dpetl.linktable import create_fact_tables, create_linktable
 from dpetl.transform import anonymize, command, datapackage
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
+
 package_dimensions = {}
 resource_dfs = []
 
@@ -21,6 +23,10 @@ def transform_package(package, **kwargs):
     # Load the anonymization secret key if present
     load_dotenv(find_dotenv(usecwd=True))
     secret_key = os.environ.get('ANONYMIZE_SECRET_KEY')
+
+    # Define path for Linktable if nedded later
+    resource_path = Path(package.resources[0].path)
+    linktable_path = resource_path.parent / 'linktable'
 
     rows = []
     errors = []
@@ -49,7 +55,7 @@ def transform_package(package, **kwargs):
                 table = anonymize.apply_anonymization(field, table, secret_key)
 
         if settings['linktable']:
-            dimensions, resource_df = create_fact_tables(resource)
+            dimensions, resource_df = create_fact_tables(resource, linktable_path)
 
             package_dimensions[resource.name] = dimensions
             resource_dfs.append(resource_df)
@@ -69,7 +75,7 @@ def transform_package(package, **kwargs):
             break
 
     if resource_dfs:
-        create_linktable(package_dimensions, resource_dfs)
+        create_linktable(package_dimensions, resource_dfs, linktable_path)
 
     # Display validation results
     validate.validate_resources(rows, errors, **kwargs)

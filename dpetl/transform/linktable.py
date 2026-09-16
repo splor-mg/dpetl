@@ -1,8 +1,6 @@
 import pandas as pd
-from frictionless import Package
-from pathlib import Path
 
-def create_fact_tables(resource):
+def create_fact_tables(resource, linktable_path):
 
     # Get dimensions and facts
     dimensions = [
@@ -18,24 +16,20 @@ def create_fact_tables(resource):
     ]
 
     # Create linktable directory if it doen´t exists
-    Path('data/linktable').mkdir(
+    linktable_path.mkdir(
         parents=True,
         exist_ok=True
     )
 
-    # Append dimensions to the package_dimentions dictionary to create the linktable later
-    package_dimensions[resource.name] = dimensions
-
-    # Read the resource as pd DataFrame
+    # Read the resource as a pandas DataFrame
     print(f'Processing {resource.name}')
     df = resource.to_pandas()
 
-    # Append the resource dataframe to the resource_dfs list, dropping the facts and duplicates
-    resource_dfs.append(
+    # Keep only dimensions for the linktable
+    resource_df = (
         df.copy()
         .drop(columns=facts)
         .drop_duplicates()
-    )
 
     # Create key
     key = (
@@ -45,25 +39,25 @@ def create_fact_tables(resource):
         .agg('|'.join, axis=1)
     )
 
-    # Remove dimensions and append key collumn on fact tables
+    # Remove dimensions and insert key in fact tables
     df = df.drop(columns=dimensions)
     df.insert(0, f'key_{resource.name}', key)
 
     # Rewrite fact table
-    print(
-        f'Writing {resource.name} '
-        f'to data/linktable/fact_{resource.name}.csv.gz'
-    )
+    output_path = linktable_path / f'fact_{resource.name}.csv.gz'
 
-    df.to_csv( # usar o load
-        f'data/linktable/fact_{resource.name}.csv.gz',
+    print(f'Writing {resource.name} to {output_path}')
+
+    df.to_csv(
+        output_path,
         index=False
     )
 
-    return package_dimensions, resource_dfs
+
+    return dimensions, resource_dfs
 
 
-def create_linktable(package_dimensions, resource_dfs):
+def create_linktable(package_dimensions, resource_dfs, linktable_path):
     # create a combined dataframe with all the dimentions from all the resources, dropping duplicates
     combined_df = pd.concat(
         resource_dfs,
@@ -87,8 +81,10 @@ def create_linktable(package_dimensions, resource_dfs):
             key
         )
 
+    output_path = linktable_path / 'linktable.csv.gz'
+
     # Write linktable
     combined_df.to_csv(
-        'data/linktable.csv.gz',
+        output_path,
         index=False
     )
