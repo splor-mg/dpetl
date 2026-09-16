@@ -88,7 +88,7 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path):
     # Write linktable
     combined_df.to_csv(
         output_path,
-        index=False
+        index=False,
         sep=';'
     )
 
