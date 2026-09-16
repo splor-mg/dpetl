@@ -31,6 +31,7 @@ def create_fact_tables(resource, linktable_path):
         df.copy()
         .drop(columns=facts)
         .drop_duplicates()
+    )
 
     # Create key
     key = (
