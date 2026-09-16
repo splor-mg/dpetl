@@ -1,4 +1,5 @@
 import pandas as pd
+from frictionless import Resource
 
 def create_fact_tables(resource, linktable_path):
 
@@ -87,4 +88,19 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path):
     combined_df.to_csv(
         output_path,
         index=False
+        sep=';'
     )
+
+    linktable_resource = Resource(
+    name='linktable',
+    type='table',
+    path=str(output_path),
+    scheme='file',
+    format='csv',
+    encoding='utf-8',
+    dialect={
+        'delimiter': ';'
+    }
+    )
+
+    return linktable_resource

@@ -4,7 +4,7 @@ import petl as etl
 from dotenv import load_dotenv, find_dotenv
 from pathlib import Path
 
-from dpetl.linktable import create_fact_tables, create_linktable
+from dpetl.transform import linktable
 from dpetl.transform import anonymize, command, datapackage
 from dpetl.helpers import validate
 
@@ -55,7 +55,7 @@ def transform_package(package, **kwargs):
                 table = anonymize.apply_anonymization(field, table, secret_key)
 
         if settings['linktable']:
-            dimensions, resource_df = create_fact_tables(resource, linktable_path)
+            dimensions, resource_df = linktable.create_fact_tables(resource, linktable_path)
 
             package_dimensions[resource.name] = dimensions
             resource_dfs.append(resource_df)
@@ -75,7 +75,8 @@ def transform_package(package, **kwargs):
             break
 
     if resource_dfs:
-        create_linktable(package_dimensions, resource_dfs, linktable_path)
+        linktable_resource = linktable.create_linktable(package_dimensions, resource_dfs, linktable_path)
+        package.resources.append(linktable_resource)
 
     # Display validation results
     validate.validate_resources(rows, errors, **kwargs)
