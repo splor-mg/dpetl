@@ -34,8 +34,8 @@ def transform_package(package, **kwargs):
         settings = datapackage.get_output_settings(resource)
 
         # Apply transformation functions to a field
-        if settings['pre_process']:
-            table = resource.to_petl()
+        table = resource.to_petl() if settings['pre_process'] else None
+        if table is not None:
             for field in resource.schema.fields:
                 # Rename fields based on target names
                 target = field.custom.get('target')
@@ -47,11 +47,12 @@ def transform_package(package, **kwargs):
                 table = anonymize.apply_anonymization(field, table, secret_key)
 
             # Export the transformed data
-            datapackage.write_files(package, resource, table, **settings)
+            if not settings['stdin']:
+                datapackage.write_files(package, resource, table, **settings)
 
         # Run an external transformation script
         if settings['cli']:
-            command.check_cli_commands(resource, **kwargs)
+            command.check_cli_commands(resource, table, **settings, **kwargs)
 
         # Update resource metadata after transformation
         datapackage.update_metadata(resource, **settings)

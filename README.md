@@ -188,6 +188,8 @@ Runs shell commands as a complement to or replacement for the built‑in pipelin
 
 - `pre_process`: optional (defaults to `true`). If `true`, the built‑in pipeline runs first and the command should (over)write that same file. If false, the built‑in pipeline is skipped and the command alone produces the output file.
 
+- `stdin`: optional (defaults to `false`). Pipes the built-in pipeline's output to each command's stdin as CSV instead of writing it to disk.
+
 The cli's output must be a file named after the resource (case‑insensitive match). Its `format`, `encoding` and `schema` are inferred directly from that file – not from the settings above.
 
 ### Field properties
