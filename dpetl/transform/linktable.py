@@ -111,7 +111,6 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path, basepath)
 
     linktable_resource = Resource(
     name='linktable',
-    type='table',
     path=str(output_path.relative_to(basepath)),
     basepath=str(basepath),
     scheme='file',
