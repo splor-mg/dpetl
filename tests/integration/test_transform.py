@@ -3,7 +3,9 @@ Integration tests for the transformation module.
 """
 import pytest
 import subprocess
+from pathlib import Path
 import petl as etl
+import pandas as pd
 from frictionless import Package, Resource
 
 from dpetl.transform import command, datapackage, transform
@@ -113,6 +115,70 @@ def test_transform_package_runs_cli(dpetl_package, scoped_package, monkeypatch):
     assert cli_calls == ['cli_resource']
 
 
+def test_transform_package_builds_linktable(dpetl_package, scoped_package, monkeypatch):
+    """
+    With dpetl_transform.linktable, a fact table and a linktable are written
+    inside the package folder, built from the transformed output.
+    """
+    mock_validation(monkeypatch)
+    monkeypatch.setattr('dpetl.transform.transform.datapackage.build_datapackage', lambda *a, **k: None)
+
+    package = scoped_package(dpetl_package, 'fato')
+    transform.transform_package(package)
+
+    linktable_dir = Path(package._basepath) / 'data' / 'linktable'
+
+    # Fact table keeps only facts plus the key built from the dimensions
+    fact = pd.read_csv(linktable_dir / 'fact_fato.csv.gz', dtype=str)
+    assert list(fact.columns) == ['key_fato', 'vlr_empenhado']
+    assert fact['vlr_empenhado'].tolist() == ['100', '200', '300']
+
+    # Keys use the renamed and anonymized values, not the raw source ones
+    years, agencies = zip(*(key.split('|') for key in fact['key_fato']))
+    assert set(years) == {'2024'}
+    assert not {'A', 'B'} & set(agencies)
+
+    # Linktable holds the unique dimension rows, comma separated
+    table = pd.read_csv(linktable_dir / 'linktable.csv.gz', dtype=str)
+    assert list(table.columns) == ['key_fato', 'ano', 'orgao']
+    assert len(table) == 2
+    assert set(table['key_fato']) == set(fact['key_fato'])
+
+    # Linktable is added to the package with a path relative to it
+    resource = package.get_resource('linktable')
+    assert resource.path == 'data/linktable/linktable.csv.gz'
+
+
+def test_transform_package_linktable_is_isolated_per_package(dpetl_package, scoped_package, monkeypatch):
+    """Linktable data collected for one package doesn't leak into the next one."""
+    mock_validation(monkeypatch)
+    monkeypatch.setattr('dpetl.transform.transform.datapackage.write_files', lambda *a, **k: None)
+    monkeypatch.setattr('dpetl.transform.transform.datapackage.update_metadata', lambda *a, **k: None)
+    monkeypatch.setattr('dpetl.transform.transform.datapackage.build_datapackage', lambda *a, **k: None)
+    monkeypatch.setattr('dpetl.transform.transform.etl.rename', lambda table, *a: table)
+    monkeypatch.setattr('dpetl.transform.transform.anonymize.apply_anonymization', lambda field, table, key: table)
+    monkeypatch.setattr(
+        'dpetl.transform.transform.linktable.create_fact_tables',
+        lambda resource, path: (['dim'], resource.name)
+    )
+
+    linktable_calls = []
+
+    def fake_create_linktable(package_dimensions, resource_dfs, *args):
+        linktable_calls.append((dict(package_dimensions), list(resource_dfs)))
+        return Resource(name='linktable', path='linktable.csv')
+    monkeypatch.setattr('dpetl.transform.transform.linktable.create_linktable', fake_create_linktable)
+
+    for _ in range(2):
+        transform.transform_package(scoped_package(dpetl_package, 'fato'))
+
+    without_linktable = scoped_package(dpetl_package, 'basic')
+    transform.transform_package(without_linktable)
+
+    assert linktable_calls == [({'fato': ['dim']}, ['fato'])] * 2
+    assert not without_linktable.has_resource('linktable')
+
+
 # Tests for get_output_settings ------------------------------------------------
 def test_get_output_settings_full_config():
     """Every dpetl_transform property present is used as-is."""
@@ -132,6 +198,7 @@ def test_get_output_settings_full_config():
         'delimiter': ';',
         'cli': None,
         'pre_process': True,
+        'linktable': False,
     }
 
 
@@ -148,6 +215,7 @@ def test_get_output_settings_defaults():
         'delimiter': ',',
         'cli': None,
         'pre_process': True,
+        'linktable': False,
     }
 
 

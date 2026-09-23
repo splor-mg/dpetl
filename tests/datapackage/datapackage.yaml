@@ -133,6 +133,26 @@ resources:
         arguments:
           - echo ok
 
+  - name: fato
+    path: data/fato.csv
+    scheme: file
+    format: csv
+    schema:
+      fields:
+        - name: Ano
+          type: string
+          target: ano
+        - name: orgao
+          type: string
+          anonymize:
+            method: sha256
+        - name: vlr_empenhado
+          type: integer
+    dpetl_transform:
+      format: csv
+      path: data/processed
+      linktable: true
+
 dpetl_load:
   owner: test_owner
   repo: test_repo
