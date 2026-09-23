@@ -1,5 +1,9 @@
+import logging
 import pandas as pd
 from frictionless import Resource
+
+logger = logging.getLogger(__name__)
+
 
 def create_fact_tables(resource, linktable_path):
 
@@ -23,7 +27,10 @@ def create_fact_tables(resource, linktable_path):
     )
 
     # Read the resource as a pandas DataFrame
-    print(f'Processing {resource.name}')
+    logger.debug(
+        'Creating fact table for resource %s.',
+        resource.name
+    )
     df = resource.to_pandas()
 
     # Keep only dimensions for the linktable
@@ -48,7 +55,11 @@ def create_fact_tables(resource, linktable_path):
     # Rewrite fact table
     output_path = linktable_path / f'fact_{resource.name}.csv.gz'
 
-    print(f'Writing {resource.name} to {output_path}')
+    logger.debug(
+        'Writing fact table for resource %s to %s.',
+        resource.name,
+        output_path
+    )
 
     df.to_csv(
         output_path,
@@ -56,10 +67,10 @@ def create_fact_tables(resource, linktable_path):
     )
 
 
-    return dimensions, resource_dfs
+    return dimensions, resource_df
 
 
-def create_linktable(package_dimensions, resource_dfs, linktable_path):
+def create_linktable(package_dimensions, resource_dfs, linktable_path, basepath):
     # create a combined dataframe with all the dimentions from all the resources, dropping duplicates
     combined_df = pd.concat(
         resource_dfs,
@@ -68,7 +79,10 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path):
 
     # Create key
     for resource_name, dimensions in package_dimensions.items():
-        print(f'Writing {resource_name} to linktable')
+        logger.debug(
+            'Adding resource %s key to linktable.',
+            resource_name
+        )
 
         key = (
             combined_df[dimensions]
@@ -86,22 +100,23 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path):
     output_path = linktable_path / 'linktable.csv.gz'
 
     # Write linktable
+    logger.debug(
+        'Writing linktable to %s.',
+        output_path
+    )
     combined_df.to_csv(
         output_path,
-        index=False,
-        sep=';'
+        index=False
     )
 
     linktable_resource = Resource(
     name='linktable',
     type='table',
-    path=str(output_path),
+    path=str(output_path.relative_to(basepath)),
+    basepath=str(basepath),
     scheme='file',
     format='csv',
-    encoding='utf-8',
-    dialect={
-        'delimiter': ';'
-    }
+    encoding='utf-8'
     )
 
     return linktable_resource

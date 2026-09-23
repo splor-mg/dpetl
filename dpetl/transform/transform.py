@@ -10,8 +10,6 @@ from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
 
-package_dimensions = {}
-resource_dfs = []
 
 def transform_package(package, **kwargs):
     """
@@ -25,11 +23,16 @@ def transform_package(package, **kwargs):
     secret_key = os.environ.get('ANONYMIZE_SECRET_KEY')
 
     # Define path for Linktable if nedded later
+    basepath = Path(package._basepath)
     resource_path = Path(package.resources[0].path)
-    linktable_path = resource_path.parent / 'linktable'
+    linktable_path = basepath / resource_path.parent / 'linktable'
 
     rows = []
     errors = []
+
+    # Linktable dimensions and data collected per package
+    package_dimensions = {}
+    resource_dfs = []
 
     for resource in package.resources:
 
@@ -54,12 +57,6 @@ def transform_package(package, **kwargs):
                 # Anonymize field
                 table = anonymize.apply_anonymization(field, table, secret_key)
 
-        if settings['linktable']:
-            dimensions, resource_df = linktable.create_fact_tables(resource, linktable_path)
-
-            package_dimensions[resource.name] = dimensions
-            resource_dfs.append(resource_df)
-
             # Export the transformed data
             datapackage.write_files(package, resource, table, **settings)
 
@@ -70,12 +67,19 @@ def transform_package(package, **kwargs):
         # Update resource metadata after transformation
         datapackage.update_metadata(resource, **settings)
 
+        # Build fact table from the transformed output
+        if settings['linktable']:
+            dimensions, resource_df = linktable.create_fact_tables(resource, linktable_path)
+
+            package_dimensions[resource.name] = dimensions
+            resource_dfs.append(resource_df)
+
         # Validate the processed resource
         if not validate.check_resource(resource, rows, errors, **kwargs):
             break
 
     if resource_dfs:
-        linktable_resource = linktable.create_linktable(package_dimensions, resource_dfs, linktable_path)
+        linktable_resource = linktable.create_linktable(package_dimensions, resource_dfs, linktable_path, basepath)
         package.resources.append(linktable_resource)
 
     # Display validation results
