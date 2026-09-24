@@ -6,6 +6,7 @@ from importlib.metadata import version
 from .extract.cli import extract
 from .transform.cli import transform_app
 from .load.cli import load
+from .linktable.cli import linktable
 
 
 app = typer.Typer(name='etl', help='ETL Command Line Interface',
@@ -14,6 +15,7 @@ app = typer.Typer(name='etl', help='ETL Command Line Interface',
 app.command()(extract)
 app.add_typer(transform_app, name='transform', help='Simplified some ETL transform operations.')
 app.command()(load)
+app.command()(linktable)
 
 
 def setup_logging(verbose: bool, quiet: bool):
@@ -52,7 +54,7 @@ def main(
         typer.Option('--descriptor', '-d',
                      help='Path to datapackage descriptor.',
                      show_default='datapackage.yaml (extract/transform) '
-                                  '/ datapackage.json (load) '
+                                  '/ datapackage.json (load/linktable) '
                                   'or datapackages/*/'
 )
     ] = None,

@@ -2,6 +2,7 @@
 Integration tests for the load module:
 GitHub repository operations, authentication, and commit handling.
 """
+import json
 import pytest
 import requests
 import subprocess
@@ -55,6 +56,27 @@ def test_load_package_repo_creation(monkeypatch, dpetl_package, scoped_package):
     load.load_package(package)
 
     assert calls == ['repo_exists', 'create_repo', 'validate', 'get_deletions', 'commit_remote']
+
+
+def test_load_package_strips_dpetl_properties(monkeypatch, dpetl_package, scoped_package):
+    """dpetl_* settings (including dpetl_linktable) are not published in datapackage.json."""
+    mock_github(monkeypatch)
+    committed = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: committed.update(files)
+    )
+    package = scoped_package(dpetl_package, 'basic')
+    package.custom['dpetl_linktable'] = {'resource_list': ['basic']}
+
+    load.load_package(package)
+
+    descriptor = json.loads(committed['datapackage.json'])
+    assert not [key for key in descriptor if key.startswith('dpetl_')]
+    assert not [
+        key for resource in descriptor['resources']
+        for key in resource if key.startswith('dpetl_')
+    ]
 
 
 def test_load_package_local_commit(monkeypatch, tmp_path):
