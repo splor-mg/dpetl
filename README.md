@@ -51,7 +51,7 @@ By default, the CLI looks for:
 
 - `datapackage.yaml` when running `extract` or `transform`
 
-- `datapackage.json` when running `load`
+- `datapackage.json` when running `load` or `linktable`
 
 If you have **multiple data packages**, place them in a `datapackages/` folder (each in its own subdirectory) and dpetl will process all of them.
 
@@ -178,6 +178,8 @@ These are read from the resource's dpetl_transform property:
 
 - `delimiter`: optional (defaults to `,`). Field separator used for `csv`/`txt` files.
 
+- `package_linktable`: optional (defaults to `false`). If `true`, the resource takes part in the package's linktable (see [Package linktable](#package-linktable)).
+
 #### `cli`
 
 Runs shell commands as a complement to or replacement for the built‑in pipeline:
@@ -218,6 +220,20 @@ Supported `method` values:
 
 You can also add a `filter` condition (a Python expression) to control which rows are anonymized.
 
+### Package linktable
+
+Builds a linktable **inside a single data package**, from the resources that set `package_linktable: true`. To build a linktable across several data packages, use the [`linktable`](#linktable) command instead.
+
+For each of these resources, after its transformation:
+
+- Fields starting with `vlr_` are **facts**; every other field is a **dimension**.
+
+- A fact table `fact_<resource>.csv.gz` is written with the facts and a `key_<resource>` column, built by joining the dimension values with `|` (e.g. `2024|A`).
+
+After all resources are processed, the distinct dimension rows of every resource are combined into `linktable.csv.gz`, with one `key_<resource>` column per resource. Dimensions with the same name in different resources share a single column.
+
+Files are written to a `linktable` folder next to the first resource's file, and the linktable is added to the package as a resource named `linktable`.
+
 > **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
 
 
@@ -256,9 +272,59 @@ Reads its settings from the package's `dpetl_load` property:
 
 If `repo` is set and the repository doesn't exist, dpetl creates it automatically.
 
-Before publishing, the `dpetl_extract`, `dpetl_transform` and `dpetl_load` properties are removed from the descriptor.
+Before publishing, the `dpetl_extract`, `dpetl_transform`, `dpetl_load` and `dpetl_linktable` properties are removed from the descriptor.
 
 A single commit publishes the transformed data and the updated `datapackage.json`, keeping the repository in sync with the current package definition.
+
+
+## `linktable`
+
+Builds a linktable **across data packages** and loads it into a new GitHub repository named `linktable`.
+
+```bash
+# Run linktable over ./datapackage.json or every datapackages/*/datapackage.json
+dpetl linktable
+
+# Run linktable over specific packages
+dpetl -d datapackages/despesa/datapackage.json -d datapackages/receita/datapackage.json linktable
+```
+
+**Remember:** run `dpetl transform` before `dpetl linktable`. The command reads the transformed `datapackage.json` of each package, so field renames (`target`) and anonymization are already applied, and dimensions with the same name in different packages represent the same data. dpetl does not check whether `transform` was run or whether its output is up to date.
+
+### Configuration
+
+Each package opts in through the package-level `dpetl_linktable` property:
+
+- `resource_list`: required. Names of the resources used to build the linktable.
+
+- `enabled`: optional (defaults to `true`). Set it to `false` (or use the shorthand `dpetl_linktable: false`) to leave the package out.
+
+Packages without `dpetl_linktable` are skipped.
+
+```yaml
+dpetl_linktable:
+  resource_list: [execucao, empenho]
+```
+
+### How it works
+
+- Each listed resource becomes a fact table `data/fact_<resource>.csv.gz`: fields starting with `vlr_` are **facts**, every other field is a **dimension**, and a `key_<resource>` column joins the dimension values with `|` (e.g. `2024|A`).
+
+- The distinct dimension rows of every resource are combined into `data/linktable.csv.gz`, with one `key_<resource>` column per resource. **Dimensions with the same name in different packages share a single column** — this is what links the packages together.
+
+- The fact tables, the linktable and a `datapackage.json` are published in a single commit, following the same steps as [`load`](#load).
+
+The destination repository reuses the `owner`, `level` and `visibility` from the packages' `dpetl_load` property, so these values must be the same in every package.
+
+The command stops with an error, before anything is published, when:
+
+- a package enables `dpetl_linktable` without a `resource_list`;
+
+- a resource in `resource_list` does not exist in the package;
+
+- two packages list resources with the same name (their fact tables would overwrite each other);
+
+- the packages' `dpetl_load` settings point to different `owner`, `level` or `visibility`.
 
 
 ## Example Data Package Configuration
@@ -367,7 +433,7 @@ Validation behavior depends on the command:
 
 - `transform`: validates each resource after transformation. Use `--validate-before` to validate the entire datapackage before processing.
 
-- `load`: validates before publishing only if `--validate-before` is used.
+- `load` and `linktable`: validate before publishing only if `--validate-before` is used.
 
 Use `--no-validate` to skip all validation.
 
@@ -399,10 +465,10 @@ Flags that can be used with any command:
 | `EMAIL_IMAP` | extract (email mode) | IMAP server address (e.g., imap.gmail.com) |
 | `HTTP_PROXY` | extract (email mode) | Proxy settings for IMAP connections* |
 | `ANONYMIZE_SECRET_KEY` | transform | Secret key for AES‑SIV anonymization |
-| `GH_TOKEN` | load | GitHub Personal Access Token |
-| `GH_APP_ID` | load | GitHub App ID |
-| `GH_APP_PRIVATE_KEY` | load | GitHub App private key |
-| `GH_APP_INSTALLATION_ID` | load | GitHub App installation ID (optional) |
+| `GH_TOKEN` | load, linktable | GitHub Personal Access Token |
+| `GH_APP_ID` | load, linktable | GitHub App ID |
+| `GH_APP_PRIVATE_KEY` | load, linktable | GitHub App private key |
+| `GH_APP_INSTALLATION_ID` | load, linktable | GitHub App installation ID (optional) |
 
 All variables above can also be set in a `.env` file in the current directory instead of the shell environment.
 
