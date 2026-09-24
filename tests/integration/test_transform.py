@@ -117,7 +117,7 @@ def test_transform_package_runs_cli(dpetl_package, scoped_package, monkeypatch):
 
 def test_transform_package_builds_linktable(dpetl_package, scoped_package, monkeypatch):
     """
-    With dpetl_transform.linktable, a fact table and a linktable are written
+    With dpetl_transform.package_linktable, a fact table and a linktable are written
     inside the package folder, built from the transformed output.
     """
     mock_validation(monkeypatch)
@@ -198,7 +198,7 @@ def test_get_output_settings_full_config():
         'delimiter': ';',
         'cli': None,
         'pre_process': True,
-        'linktable': False,
+        'package_linktable': False,
     }
 
 
@@ -215,7 +215,7 @@ def test_get_output_settings_defaults():
         'delimiter': ',',
         'cli': None,
         'pre_process': True,
-        'linktable': False,
+        'package_linktable': False,
     }
 
 

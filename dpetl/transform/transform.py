@@ -68,7 +68,7 @@ def transform_package(package, **kwargs):
         datapackage.update_metadata(resource, **settings)
 
         # Build fact table from the transformed output
-        if settings['linktable']:
+        if settings['package_linktable']:
             dimensions, resource_df = linktable.create_fact_tables(resource, linktable_path)
 
             package_dimensions[resource.name] = dimensions

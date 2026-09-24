@@ -151,7 +151,7 @@ resources:
     dpetl_transform:
       format: csv
       path: data/processed
-      linktable: true
+      package_linktable: true
 
 dpetl_load:
   owner: test_owner
