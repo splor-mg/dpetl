@@ -11,10 +11,11 @@ from frictionless import Package, Resource
 from dpetl.linktable import linktable
 
 
-def make_package(tmp_path, name, resources, dpetl_linktable=None, dpetl_load=None):
+def make_package(tmp_path, name, resources, dpetl_linktable=None, dpetl_load=None, folder=None):
     """Write a transformed-like datapackage.json (plus its CSV files, with inferred
-    schemas as update_metadata does) and load it."""
-    folder = tmp_path / name
+    schemas as update_metadata does) and load it. 'folder' allows two packages
+    with the same name (e.g. the same package in different years)."""
+    folder = tmp_path / (folder or name)
     (folder / 'data').mkdir(parents=True)
 
     descriptor = {'name': name, 'resources': []}
@@ -69,17 +70,19 @@ def test_linktable_packages_builds_fact_tables_and_linktable(tmp_path, capture_l
     [call] = capture_load
     files = call['files']
     assert sorted(files) == [
-        'data/fact_arrecadacao.csv.gz',
-        'data/fact_execucao.csv.gz',
+        'data/fact_despesa_execucao.csv.gz',
+        'data/fact_receita_arrecadacao.csv.gz',
         'data/linktable.csv.gz',
     ]
 
-    fact = files['data/fact_execucao.csv.gz']
-    assert list(fact.columns) == ['key_execucao', 'vlr_empenhado']
-    assert fact['key_execucao'].tolist() == ['2024|A', '2024|B']
+    fact = files['data/fact_despesa_execucao.csv.gz']
+    assert list(fact.columns) == ['key_despesa_execucao', 'vlr_empenhado']
+    assert fact['key_despesa_execucao'].tolist() == ['2024|A', '2024|B']
 
     table = files['data/linktable.csv.gz']
-    assert set(table.columns) == {'key_execucao', 'key_arrecadacao', 'ano', 'orgao', 'uf'}
+    assert set(table.columns) == {
+        'key_despesa_execucao', 'key_receita_arrecadacao', 'ano', 'orgao', 'uf',
+    }
     assert len(table) == 3
 
 
@@ -117,8 +120,77 @@ def test_linktable_packages_only_uses_listed_resources(tmp_path, capture_load):
     linktable.linktable_packages([package], no_validate=True)
 
     [call] = capture_load
-    assert 'data/fact_auxiliar.csv.gz' not in call['files']
-    assert [r.name for r in call['package'].resources] == ['fact_execucao', 'linktable']
+    assert 'data/fact_despesa_auxiliar.csv.gz' not in call['files']
+    assert [r.name for r in call['package'].resources] == ['fact_despesa_execucao', 'linktable']
+
+
+# Resources with the same name ------------------------------------------------
+def test_linktable_packages_keeps_same_resource_of_different_packages_apart(tmp_path, capture_load):
+    """The same resource name in different packages becomes two fact tables, prefixed by package."""
+    packages = [
+        make_package(
+            tmp_path, name,
+            {'execucao': 'ano,vlr_valor\n2024,100\n'},
+            dpetl_linktable={'resource_list': ['execucao']},
+        )
+        for name in ('despesa', 'receita')
+    ]
+
+    linktable.linktable_packages(packages)
+
+    [call] = capture_load
+    assert sorted(call['files']) == [
+        'data/fact_despesa_execucao.csv.gz',
+        'data/fact_receita_execucao.csv.gz',
+        'data/linktable.csv.gz',
+    ]
+
+
+def test_linktable_packages_stacks_same_package_in_different_years(tmp_path, capture_load):
+    """The same package and resource (e.g. different years) are stacked into one fact table."""
+    packages = [
+        make_package(
+            tmp_path, 'dados_siafi',
+            {'execucao': f'ano,orgao,vlr_empenhado\n{year},A,{value}\n'},
+            dpetl_linktable={'resource_list': ['execucao']},
+            folder=f'dados_siafi_{year}',
+        )
+        for year, value in ((2024, 100), (2025, 200))
+    ]
+
+    linktable.linktable_packages(packages)
+
+    [call] = capture_load
+    fact = call['files']['data/fact_dados_siafi_execucao.csv.gz']
+    assert fact.to_dict('list') == {
+        'key_dados_siafi_execucao': ['2024|A', '2025|A'],
+        'vlr_empenhado': ['100', '200'],
+    }
+
+    table = call['files']['data/linktable.csv.gz']
+    assert table['key_dados_siafi_execucao'].tolist() == ['2024|A', '2025|A']
+
+
+def test_linktable_packages_fails_on_stacking_different_fields(tmp_path, capture_load, caplog):
+    """Stacked resources must share the same dimensions and facts."""
+    packages = [
+        make_package(
+            tmp_path, 'dados_siafi',
+            {'execucao': csv},
+            dpetl_linktable={'resource_list': ['execucao']},
+            folder=f'dados_siafi_{year}',
+        )
+        for year, csv in (
+            (2024, 'ano,orgao,vlr_empenhado\n2024,A,100\n'),
+            (2025, 'ano,uo,vlr_empenhado\n2025,A,200\n'),
+        )
+    ]
+
+    with pytest.raises(SystemExit):
+        linktable.linktable_packages(packages)
+
+    assert 'Resource execucao has different fields in packages named dados_siafi.' in caplog.text
+    assert capture_load == []
 
 
 # Package selection ------------------------------------------------------------
@@ -164,24 +236,6 @@ def test_linktable_packages_fails_on_unknown_resource(tmp_path, capture_load, ca
         linktable.linktable_packages([package])
 
     assert 'Resources not found in package despesa: inexistente.' in caplog.text
-    assert capture_load == []
-
-
-def test_linktable_packages_fails_on_duplicated_resource_name(tmp_path, capture_load, caplog):
-    """Two packages with a resource of the same name would overwrite each other's fact table."""
-    packages = [
-        make_package(
-            tmp_path, name,
-            {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-            dpetl_linktable={'resource_list': ['execucao']},
-        )
-        for name in ('despesa', 'despesa_2')
-    ]
-
-    with pytest.raises(SystemExit):
-        linktable.linktable_packages(packages)
-
-    assert 'Resource execucao exists in packages despesa and despesa_2.' in caplog.text
     assert capture_load == []
 
 

@@ -1,10 +1,11 @@
 import logging
 import tempfile
+import pandas as pd
 from pathlib import Path
 from frictionless import Package, Resource
 
 from dpetl.load import github, load
-from dpetl.transform.linktable import create_fact_tables, create_linktable
+from dpetl.transform.linktable import build_key, create_linktable, split_fields
 
 logger = logging.getLogger('dpetl.linktable')
 
@@ -75,56 +76,99 @@ def get_load_settings(packages):
     }
 
 
+def group_fact_tables(selected):
+    """
+    Group the resources into fact tables named <package>_<resource>.
+    Resources sharing both names (e.g. the same package in different years)
+    are stacked into a single fact table.
+    """
+    groups = {}
+
+    for package, resources in selected:
+        for resource in resources:
+            name = f'{package.name}_{resource.name}'
+            dimensions, facts = split_fields(resource)
+
+            group = groups.setdefault(name, {
+                'dimensions': dimensions,
+                'facts': facts,
+                'frames': [],
+            })
+
+            # Stacked resources must share the same fields
+            if (set(dimensions) != set(group['dimensions'])
+                    or set(facts) != set(group['facts'])):
+                logger.error(
+                    'Resource %s has different fields in packages named %s. '
+                    'Stacked fact tables need the same dimensions and facts.',
+                    resource.name, package.name
+                )
+                raise SystemExit(1)
+
+            group['frames'].append(resource.to_pandas())
+
+    return groups
+
+
+def write_fact_table(name, group, data_path):
+    """
+    Write the fact table and return its distinct dimension rows.
+    """
+    dimensions = group['dimensions']
+    df = pd.concat(group['frames'], ignore_index=True)
+
+    if len(group['frames']) > 1:
+        logger.info(
+            'Stacking %d resources into fact table %s.',
+            len(group['frames']), name
+        )
+
+    fact = df[group['facts']].copy()
+    fact.insert(0, f'key_{name}', build_key(df, dimensions))
+
+    output_path = data_path / f'fact_{name}.csv.gz'
+    logger.debug('Writing fact table %s to %s.', name, output_path)
+    fact.to_csv(output_path, index=False)
+
+    return df[dimensions].drop_duplicates()
+
+
 def linktable_packages(packages, **kwargs):
     """
     Build fact tables and a linktable across data packages and load them
     into a GitHub repository.
     """
-    selected = {}
+    selected = []
     for package in packages:
         resources = get_resource_list(package)
         if resources:
-            selected[package.name] = (package, resources)
+            selected.append((package, resources))
 
     if not selected:
         logger.warning('No package is configured with "dpetl_linktable".')
         return
 
-    load_settings = get_load_settings(
-        [package for package, _ in selected.values()]
-    )
+    load_settings = get_load_settings([package for package, _ in selected])
+
+    groups = group_fact_tables(selected)
 
     with tempfile.TemporaryDirectory() as tmp:
         basepath = Path(tmp)
         data_path = basepath / 'data'
+        data_path.mkdir()
 
         package_dimensions = {}
         resource_dfs = []
         fact_resources = []
-        sources = {}
 
-        for package_name, (package, resources) in selected.items():
-            logger.info('Building fact tables for package %s.', package_name)
+        for name, group in groups.items():
+            resource_dfs.append(write_fact_table(name, group, data_path))
+            package_dimensions[name] = group['dimensions']
 
-            for resource in resources:
-                # Resources with the same name would overwrite each other
-                if resource.name in sources:
-                    logger.error(
-                        'Resource %s exists in packages %s and %s. '
-                        'Resource names must be unique across the linktable.',
-                        resource.name, sources[resource.name], package_name
-                    )
-                    raise SystemExit(1)
-                sources[resource.name] = package_name
-
-                dimensions, resource_df = create_fact_tables(resource, data_path)
-                package_dimensions[resource.name] = dimensions
-                resource_dfs.append(resource_df)
-
-                fact_resources.append(Resource(
-                    path=f'data/fact_{resource.name}.csv.gz',
-                    basepath=str(basepath),
-                ))
+            fact_resources.append(Resource(
+                path=f'data/fact_{name}.csv.gz',
+                basepath=str(basepath),
+            ))
 
         logger.info('Building linktable.')
         linktable_resource = create_linktable(

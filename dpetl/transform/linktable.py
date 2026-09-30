@@ -5,20 +5,33 @@ from frictionless import Resource
 logger = logging.getLogger(__name__)
 
 
+def split_fields(resource):
+    """
+    Split the resource fields into dimensions and facts (fields starting
+    with vlr_).
+    """
+    names = [field.name for field in resource.schema.fields]
+    dimensions = [name for name in names if not name.startswith('vlr_')]
+    facts = [name for name in names if name.startswith('vlr_')]
+    return dimensions, facts
+
+
+def build_key(df, dimensions):
+    """
+    Build the linktable key by joining the dimension values with '|'.
+    """
+    return (
+        df[dimensions]
+        .astype('string')
+        .fillna('')
+        .agg('|'.join, axis=1)
+    )
+
+
 def create_fact_tables(resource, linktable_path):
 
     # Get dimensions and facts
-    dimensions = [
-        field.name
-        for field in resource.schema.fields
-        if not field.name.startswith('vlr_')
-    ]
-
-    facts = [
-        field.name
-        for field in resource.schema.fields
-        if field.name.startswith('vlr_')
-    ]
+    dimensions, facts = split_fields(resource)
 
     # Create linktable directory if it doen´t exists
     linktable_path.mkdir(
@@ -41,12 +54,7 @@ def create_fact_tables(resource, linktable_path):
     )
 
     # Create key
-    key = (
-        df[dimensions]
-        .astype('string')
-        .fillna('')
-        .agg('|'.join, axis=1)
-    )
+    key = build_key(df, dimensions)
 
     # Remove dimensions and insert key in fact tables
     df = df.drop(columns=dimensions)
@@ -84,12 +92,7 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path, basepath)
             resource_name
         )
 
-        key = (
-            combined_df[dimensions]
-            .astype('string')
-            .fillna('')
-            .agg('|'.join, axis=1)
-        )
+        key = build_key(combined_df, dimensions)
 
         combined_df.insert(
             0,

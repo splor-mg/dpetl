@@ -308,9 +308,11 @@ dpetl_linktable:
 
 ### How it works
 
-- Each listed resource becomes a fact table `data/fact_<resource>.csv.gz`: fields starting with `vlr_` are **facts**, every other field is a **dimension**, and a `key_<resource>` column joins the dimension values with `|` (e.g. `2024|A`).
+- Each listed resource becomes a fact table `data/fact_<package>_<resource>.csv.gz`: fields starting with `vlr_` are **facts**, every other field is a **dimension**, and a `key_<package>_<resource>` column joins the dimension values with `|` (e.g. `2024|A`). The package prefix keeps resources with the same name in different packages apart.
 
-- The distinct dimension rows of every resource are combined into `data/linktable.csv.gz`, with one `key_<resource>` column per resource. **Dimensions with the same name in different packages share a single column** — this is what links the packages together.
+- Resources with the same package **and** resource names — typically the same package in different years — are **stacked** into a single fact table. They must have the same dimensions and facts, and the year must be one of the dimensions (e.g. an `ano` field); otherwise rows from different years get the same key.
+
+- The distinct dimension rows of every fact table are combined into `data/linktable.csv.gz`, with one `key_<package>_<resource>` column per fact table. **Dimensions with the same name in different packages share a single column** — this is what links the packages together.
 
 - The fact tables, the linktable and a `datapackage.json` are published in a single commit, following the same steps as [`load`](#load).
 
@@ -322,7 +324,7 @@ The command stops with an error, before anything is published, when:
 
 - a resource in `resource_list` does not exist in the package;
 
-- two packages list resources with the same name (their fact tables would overwrite each other);
+- stacked resources (same package and resource names) have different dimensions or facts;
 
 - the packages' `dpetl_load` settings point to different `owner`, `level` or `visibility`.
 
