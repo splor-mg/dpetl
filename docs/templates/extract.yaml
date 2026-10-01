@@ -1,0 +1,32 @@
+  # API extraction
+  - name: invoices
+    path: data/invoices.csv
+    sources:   # Request settings
+      - method: get   # required (e.g. get, post)
+        path: https://api.example.com   # required
+        timeout: 30   # optional (Defaults to 30 seconds)
+        params: {}   # optional
+        headers: {}   # optional
+        stream: false   # optional (Defaults to false)
+    dpetl_extract:
+      mode: api
+
+  # CLI extraction
+  - name: external_data
+    path: data/external_data.csv
+    dpetl_extract:
+      mode: cli
+      arguments:   # required. List of shell commands to run sequentially
+        - curl -o data/external_data.csv https://api.example.com/export
+        - python scripts/clean_data.py data/external_data.csv
+
+  # Email extraction
+  - name: payroll_from_email
+    path: data/payroll.xlsx
+    dpetl_extract:
+      mode: email
+      mailbox: INBOX   # optional (Defaults to INBOX)
+      criteria:   # optional
+        subject: "Payroll Report"   # optional (Defaults to resource name. See also the flag --add-package-name)
+        from_: "finance@example.com"   # optional
+        date_gte: 2024-01-01   # optional (See also the flag --today-email)

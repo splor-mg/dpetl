@@ -1,0 +1,6 @@
+# Load configuration (defined once per package)
+dpetl_load:
+  owner: github-username
+  repo: my-data-repo
+  level: user   # optional (Defaults to user)
+  visibility: private   # optional (Defaults to private)
