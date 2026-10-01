@@ -1,9 +1,12 @@
 """
 Integration tests for the transformation module.
 """
-import pytest
+import json
+import os
 import subprocess
+
 import petl as etl
+import pytest
 from frictionless import Package, Resource
 
 from dpetl.transform import command, datapackage, transform
@@ -377,6 +380,79 @@ def test_run_cli_command_file_not_found(monkeypatch, caplog):
     command.run_cli_command('nonexistent', type('Resource', (), {'name': 'test'})(), None)
 
     assert "CLI command not found for resource test" in caplog.text
+
+
+def _cli_resource(custom):
+    package = type('Package', (), {'custom': custom})()
+    return type('Resource', (), {'name': 'test', 'package': package})()
+
+
+@pytest.mark.parametrize('custom', [
+    {'dpetl_load': {'owner': 'splor-mg'}},
+    {'custom': []},
+    {'custom': {}},
+])
+def test_run_cli_command_omits_env_without_custom(monkeypatch, custom):
+    """No custom block omits env so the child inherits the parent."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    command.run_cli_command('cmd', _cli_resource(custom), None)
+
+    assert captured['env'] is None
+
+
+def test_run_cli_command_injects_list_of_maps_custom(monkeypatch):
+    """List-of-maps custom becomes JSON env vars on the child only."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    sources = [{'id': 'relatorios', 'source': 'https://example.com/repo.git'}]
+    flows = [{'id': 'receita', 'rules': ['is_asps_rec']}]
+    resource = _cli_resource({
+        'dpetl_load': {'owner': 'splor-mg'},
+        'custom': [{'sources': sources}, {'flows': flows}],
+    })
+
+    command.run_cli_command('cmd', resource, None)
+
+    env = captured['env']
+    assert json.loads(env['sources']) == sources
+    assert json.loads(env['flows']) == flows
+    assert 'dpetl_load' not in env
+    assert 'sources' not in os.environ
+    assert 'flows' not in os.environ
+
+
+def test_run_cli_command_injects_mapping_custom(monkeypatch):
+    """A mapping custom block is JSON-encoded like a list of maps."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    sources = [{'id': 'relatorios', 'source': 'https://example.com/repo.git'}]
+    flows = [{'id': 'receita', 'rules': ['is_asps_rec']}]
+    resource = _cli_resource({
+        'custom': {'sources': sources, 'flows': flows, 'extra': {'k': 1}},
+    })
+
+    command.run_cli_command('cmd', resource, None)
+
+    env = captured['env']
+    assert json.loads(env['sources']) == sources
+    assert json.loads(env['flows']) == flows
+    assert json.loads(env['extra']) == {'k': 1}
 
 
 # Tests for build_datapackage --------------------------------------------------

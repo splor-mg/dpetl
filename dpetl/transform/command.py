@@ -1,9 +1,50 @@
+import json
 import logging
+import os
 import shlex
 import subprocess
+
 import petl as etl
 
 logger = logging.getLogger(__name__)
+
+
+def flatten_custom(block):
+    """
+    Merge a custom block into one dict.
+    Accepts a mapping or a list of one-key maps; anything else is empty.
+    """
+    if isinstance(block, dict):
+        return block
+
+    if isinstance(block, list):
+        merged = {}
+        for item in block:
+            if isinstance(item, dict):
+                merged.update(item)
+        return merged
+
+    return {}
+
+
+def build_child_env(resource):
+    """
+    Copy os.environ and JSON-encode each flattened custom key as an env var.
+    Returns nothing when custom is missing or empty, so the child inherits
+    the parent environment unchanged.
+    """
+    package = getattr(resource, 'package', None)
+    if package is None:
+        return
+
+    flattened = flatten_custom(package.custom.get('custom'))
+    if not flattened:
+        return
+
+    child_env = os.environ.copy()
+    for key, value in flattened.items():
+        child_env[str(key)] = json.dumps(value)
+    return child_env
 
 
 def build_stdin_data(table, stdin, encoding, delimiter, **kwargs):
@@ -49,7 +90,12 @@ def run_cli_command(command, resource, data, **kwargs):
     )
 
     try:
-        subprocess.run(shlex.split(command), input=data, check=True)
+        subprocess.run(
+            shlex.split(command),
+            input=data,
+            env=build_child_env(resource),
+            check=True,
+        )
 
     except subprocess.CalledProcessError as e:
         logger.error(
