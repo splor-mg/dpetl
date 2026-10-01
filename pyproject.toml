@@ -48,6 +48,11 @@ dev = [
     'setuptools (<81)',
     'commitizen (>=4.17.0,<5.0.0)'
 ]
+docs = [
+    "zensical (>=0.0.67,<0.0.68)",
+    "mkdocstrings-python (>=2.0.9,<3.0.0)",
+    "jinja2 (>=3.1.6,<4.0.0)"
+]
 
 [tool.commitizen]
 name = 'cz_conventional_commits'
@@ -85,5 +90,7 @@ test_debug = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests in debug mode.'
 coverage_html = { cmd = 'coverage html', help = 'Generates an HTML coverage report.' }
 coverage_badge = { cmd = 'coverage-badge -o coverage.svg -f', help = 'Generates the README coverage badge.' }
 check = { cmd = 'task lint && task test', help = 'Runs lint and tests.' }
+serve = { cmd = 'zensical serve', help = 'Serves the documentation site locally.' }
+build = { cmd = 'zensical build --clean', help = 'Builds the documentation site.' }
 bump = { cmd = 'cz bump', help = 'Bumps project version.' }
 publish = { cmd = 'task bump && dotenv run poetry publish --build -n && git push origin main --tags', help = 'Bumps version and publish the package on Pypi.' }

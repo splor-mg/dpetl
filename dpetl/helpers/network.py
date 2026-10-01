@@ -7,6 +7,9 @@ from dotenv import find_dotenv, load_dotenv
 
 
 def force_ipv4():
+    """
+    Make all host name lookups resolve to IPv4 addresses only.
+    """
     original_getaddrinfo = socket.getaddrinfo
 
     def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
@@ -23,6 +26,12 @@ def force_ipv4():
 
 
 def configure_proxy_from_env():
+    """
+    Route socket connections through the proxy set in the environment.
+
+    Reads `HTTPS_PROXY` or `HTTP_PROXY` (upper or lower case) and loads
+    the `.env` file from the current working directory.
+    """
     load_dotenv(find_dotenv(usecwd=True))
 
     force_ipv4()

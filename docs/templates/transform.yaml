@@ -1,0 +1,39 @@
+  # Column renaming
+  - name: customers
+    path: data/customers.csv
+    schema:
+      fields:
+        - name: Name
+          type: string
+          target: customer_name
+        - name: Region
+          type: string
+          target: customer_region
+    dpetl_transform:
+      format: csv.gz   # optional (Defaults to csv.gz)
+      path: data/processed   # optional (Defaults to data)
+      encoding: utf-8   # optional (Defaults to utf-8)
+      delimiter: ';'   # optional (Defaults to ,)
+
+  # Anonymization of sensitive fields
+  - name: employees
+    path: data/employees.csv
+    schema:
+      fields:
+        - name: employee_name
+          type: string
+          target: name_hashed
+          anonymize:
+            method: '[#***]'
+        - name: tax_id
+          type: string
+          target: tax_id_encrypted
+          anonymize:
+            method: aes_siv
+            context: department
+            annotation: TAX:11
+            filter: 'department == "Finance"'
+        - name: phone
+          type: string
+          anonymize:
+            method: '[###-***-####]'
