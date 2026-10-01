@@ -207,11 +207,21 @@ def test_create_repo_api_error(monkeypatch, caplog):
 
 
 # Tests for github.commit_remote -----------------------------------------------
-def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=False):
-    """Mocks the GitHub git-data API sequence commit_remote walks through."""
+def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=False, fail_on=None):
+    """Mocks the GitHub git-data API sequence commit_remote walks through.
+    'fail_on' makes requests to URLs containing it fail like a GitHub error."""
     patch_called = []
 
+    def failed(url):
+        return SimpleNamespace(
+            ok=False, status_code=422, text='',
+            json=lambda: {'message': 'GitHub refused it'},
+            raise_for_status=lambda: (_ for _ in ()).throw(requests.exceptions.HTTPError(url)),
+        )
+
     def mock_get(url, headers=None):
+        if fail_on and fail_on in url:
+            return failed(url)
         if url == 'https://api.github.com/repos/owner/repo':
             data = {'default_branch': 'main'}
         elif '/git/refs/heads/' in url:
@@ -220,9 +230,11 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             data = {'tree': {'sha': 'base_tree_sha'}}
         else:
             data = {}
-        return SimpleNamespace(status_code=200, json=lambda: data, raise_for_status=lambda: None)
+        return SimpleNamespace(ok=True, status_code=200, json=lambda: data, raise_for_status=lambda: None)
 
     def mock_post(url, headers=None, json=None):
+        if fail_on and fail_on in url:
+            return failed(url)
         if '/git/trees' in url:
             if check_tree_deletion:
                 assert any(item.get('sha') is None for item in json.get('tree', []))
@@ -231,11 +243,13 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             sha = 'blob_sha'
         else:
             sha = 'new_commit_sha'
-        return SimpleNamespace(status_code=201, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
+        return SimpleNamespace(ok=True, status_code=201, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
 
     def mock_patch(url, headers=None, json=None):
         patch_called.append(True)
-        return SimpleNamespace(status_code=200, raise_for_status=lambda: None)
+        if fail_on == 'patch':
+            return failed(url)
+        return SimpleNamespace(ok=True, status_code=200, raise_for_status=lambda: None)
 
     monkeypatch.setattr(requests, 'get', mock_get)
     monkeypatch.setattr(requests, 'post', mock_post)
@@ -251,6 +265,23 @@ def test_commit_remote(monkeypatch):
     github.commit_remote('token', files, set(), owner='owner', repo='repo')
 
     assert patch_called == [True]
+
+
+@pytest.mark.parametrize('fail_on, action', [
+    ('/git/refs/heads/', 'reading branch main'),
+    ('/git/blobs', 'uploading big.csv (0.0 MB)'),
+    ('/git/trees', 'creating the file tree'),
+    ('patch', 'updating branch main'),
+])
+def test_commit_remote_reports_github_errors(monkeypatch, caplog, fail_on, action):
+    """A refused request stops the commit and logs GitHub's message with the failed step."""
+    mock_git_api(monkeypatch, tree_sha='new_tree_sha', fail_on=fail_on)
+
+    with pytest.raises(requests.exceptions.HTTPError):
+        github.commit_remote('token', {'big.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    assert f'GitHub API error while {action}: 422 GitHub refused it' in caplog.text
+    assert 'Successfully committed' not in caplog.text
 
 
 def test_commit_remote_with_deletions(monkeypatch):

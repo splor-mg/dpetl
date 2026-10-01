@@ -161,6 +161,25 @@ def get_deletions(token, files, owner, repo, **kwargs):
     return previous_paths - current_paths
 
 
+def check_response(r, action):
+    """
+    Log the GitHub error message and raise when a request failed.
+    """
+    if r.ok:
+        return r
+
+    try:
+        message = r.json().get('message')
+    except ValueError:
+        message = r.text
+
+    logger.error(
+        'GitHub API error while %s: %s %s',
+        action, r.status_code, message
+    )
+    r.raise_for_status()
+
+
 def commit_remote(token, files, deletions, owner, repo, **kwargs):
     """
     Create a single commit with multiple files using the GitHub Git Data API.
@@ -176,34 +195,36 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
 
     # Get repository information
     r = requests.get(url, headers=headers)
-    r.raise_for_status()
+    check_response(r, f'reading repository {owner}/{repo}')
     branch = r.json()['default_branch']
 
     # Retrieve current HEAD commit and tree
     r = requests.get(f'{url}/git/refs/heads/{branch}', headers=headers)
-    r.raise_for_status()
+    check_response(r, f'reading branch {branch}')
     sha = r.json()['object']['sha']
 
-    commit = requests.get(f'{url}/git/commits/{sha}', headers=headers).json()
-    base_tree = commit['tree']['sha']
+    r = requests.get(f'{url}/git/commits/{sha}', headers=headers)
+    check_response(r, f'reading commit {sha}')
+    base_tree = r.json()['tree']['sha']
 
     # Create blobs for each file
     items = []
     for path, content in files.items():
-        blob = requests.post(
+        r = requests.post(
             f'{url}/git/blobs',
             headers=headers,
             json={
                 'content': base64.b64encode(content).decode(),
                 'encoding': 'base64'
             }
-        ).json()
+        )
+        check_response(r, f'uploading {path} ({len(content) / 1e6:.1f} MB)')
 
         items.append({
             'path': path,
             'mode': '100644',
             'type': 'blob',
-            'sha': blob['sha']
+            'sha': r.json()['sha']
         })
 
     # Remove resources that no longer belong to the data package
@@ -219,14 +240,16 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
             })
 
     # Build updated file tree
-    tree = requests.post(
+    r = requests.post(
         f'{url}/git/trees',
         headers=headers,
         json={
             'base_tree': base_tree,
             'tree': items
         }
-    ).json()
+    )
+    check_response(r, 'creating the file tree')
+    tree = r.json()
 
     if tree['sha'] == base_tree:
         logger.info('No changes to commit.')
@@ -235,7 +258,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     # Create commit with timestamp
     timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
-    new_commit = requests.post(
+    r = requests.post(
         f'{url}/git/commits',
         headers=headers,
         json={
@@ -243,14 +266,17 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
             'tree': tree['sha'],
             'parents': [sha]
         }
-    ).json()
+    )
+    check_response(r, 'creating the commit')
+    new_commit = r.json()
 
     # Update branch to new commit
-    requests.patch(
+    r = requests.patch(
         f'{url}/git/refs/heads/{branch}',
         headers=headers,
         json={'sha': new_commit['sha']}
     )
+    check_response(r, f'updating branch {branch}')
 
     logger.info(
         'Successfully committed %d files to %s/%s. Commit=%s Files=[%s]',

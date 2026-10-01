@@ -152,6 +152,7 @@ def linktable_packages(packages, **kwargs):
 
     groups = group_fact_tables(selected)
 
+
     with tempfile.TemporaryDirectory() as tmp:
         basepath = Path(tmp)
         data_path = basepath / 'data'
@@ -178,6 +179,7 @@ def linktable_packages(packages, **kwargs):
         resources = [*fact_resources, linktable_resource]
         for resource in resources:
             resource.infer(stats=True)
+
 
         package = Package(
             name=REPO_NAME,
