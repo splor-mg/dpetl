@@ -1,3 +1,10 @@
+## 0.18.0 (2026-10-05)
+
+### Feat
+
+- **dpetl-transform**: custom env variables injection to cli subprocess via transform
+- **transform**: pipe built-in pipeline output to cli commands via stdin
+
 ## 0.17.0 (2026-09-09)
 
 ### Feat
