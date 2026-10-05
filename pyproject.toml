@@ -1,16 +1,12 @@
-[build-system]
-requires = ['poetry-core>=2.0.0,<3.0.0']
-build-backend = 'poetry.core.masonry.api'
-
 [project]
 name = 'dpetl'
-version = "0.17.0"
+version = '0.17.0'
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
 ]
 readme = 'README.md'
-requires-python = '>=3.10,<4.0'
+requires-python = '>=3.13,<4.0'
 dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
     'python-dotenv (>=1.2.1,<2.0.0)',
@@ -37,13 +33,10 @@ dpetl = 'dpetl.cli:app'
 [tool.repo-template]
 upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
-[tool.commitizen]
-name = 'cz_conventional_commits'
-tag_format = '$version'
-version_scheme = 'pep440'
-version_provider = 'pep621'
-update_changelog_on_bump = true
-major_version_zero = true
+[build-system]
+requires = ['poetry-core>=2.0.0,<3.0.0']
+build-backend = 'poetry.core.masonry.api'
+
 [dependency-groups]
 dev = [
     'ipdb (>=0.13.13,<0.14.0)',
@@ -55,6 +48,14 @@ dev = [
     'setuptools (<81)',
     'commitizen (>=4.17.0,<5.0.0)'
 ]
+
+[tool.commitizen]
+name = 'cz_conventional_commits'
+tag_format = '$version'
+version_scheme = 'pep440'
+version_provider = 'pep621'
+update_changelog_on_bump = true
+major_version_zero = true
 
 [tool.poetry]
 packages = [{ include = 'dpetl' }]
