@@ -42,6 +42,8 @@ Runs shell commands as a complement to or replacement for the built‑in pipelin
 
 - `stdin`: optional (defaults to `false`). Pipes the built-in pipeline's output to each command's stdin as CSV instead of writing it to disk.
 
+- `custom`: optional. Defined at the package level, not inside `cli`. Each key is passed to the commands as an environment variable, with its value written as JSON.
+
 The cli's output must be a file named after the resource (case‑insensitive match). Its `format`, `encoding` and `schema` are inferred directly from that file – not from the settings above.
 
 ## Field properties
