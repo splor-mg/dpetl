@@ -171,7 +171,7 @@ jobs:
           POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
         run: |
           VERSION=$(poetry version -s)
-          if poetry run python -c "import requests; exit(0 if requests.get('https://pypi.org/pypi/${VERSION}/json').status_code == 200 else 1)"; then
+          if curl -sf -o /dev/null "https://pypi.org/pypi/dpetl/${VERSION}/json"; then
             echo "Version ${VERSION} already exists on PyPI, skipping publish."
           else
             poetry publish --build -n
