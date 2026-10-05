@@ -37,3 +37,19 @@
           type: string
           anonymize:
             method: '[###-***-####]'
+
+  # External command
+  - name: payroll
+    path: data/payroll.csv
+    dpetl_transform:
+      cli:
+        arguments:   # required. List of shell commands to run sequentially
+          - python scripts/clean_payroll.py
+        path: data/processed   # optional (Defaults to dpetl_transform.path)
+        pre_process: true   # optional (Defaults to true)
+        stdin: true   # optional (Defaults to false)
+
+# Package level. Passed to every cli command as an environment variable
+custom:
+  - year: 2027
+    region: south
