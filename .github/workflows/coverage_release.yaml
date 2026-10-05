@@ -70,7 +70,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --extras github-app
+        run: poetry install --no-interaction --extras "github-app postgres"
 
       - name: Run tests with coverage and update badge
         run: |
@@ -152,7 +152,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --extras github-app
+        run: poetry install --no-interaction --extras "github-app postgres"
 
       - name: Bump version and push
         run: |

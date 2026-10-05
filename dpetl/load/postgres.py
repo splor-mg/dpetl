@@ -87,14 +87,14 @@ def copy_resource(cursor, schema, resource, basepath):
     """
     Stream the resource file into its table with COPY.
     """
-    from psycopg import sql
-
     if resource.format not in FORMATS:
         logger.error(
             'Resource %s has format %s. Postgres loading supports: %s.',
             resource.name, resource.format, ', '.join(FORMATS)
         )
         raise SystemExit(1)
+
+    from psycopg import sql
 
     dialect = resource.dialect
     delimiter = (
