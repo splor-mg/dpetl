@@ -9,6 +9,7 @@ from pathlib import Path
 from frictionless import Package, Resource
 
 from dpetl.linktable import linktable
+from dpetl.load import load
 
 
 def make_package(tmp_path, name, resources, dpetl_linktable=None, dpetl_load=None, folder=None):
@@ -102,6 +103,7 @@ def test_linktable_packages_loads_to_linktable_repo(tmp_path, capture_load):
     assert call['package'].name == 'linktable'
     assert call['package'].custom['dpetl_load'] == {
         'owner': 'splor', 'repo': 'linktable', 'level': 'orgs', 'visibility': 'public',
+        'target': 'github',
     }
     assert call['kwargs'] == {'no_validate': True}
 
@@ -122,6 +124,46 @@ def test_linktable_packages_only_uses_listed_resources(tmp_path, capture_load):
     [call] = capture_load
     assert 'data/fact_despesa_auxiliar.csv.gz' not in call['files']
     assert [r.name for r in call['package'].resources] == ['fact_despesa_execucao', 'linktable']
+
+
+def test_linktable_packages_follows_postgres_target(tmp_path, capture_load):
+    """Sources loading to Postgres send the linktable to Postgres too (schema 'linktable')."""
+    package = make_package(
+        tmp_path, 'despesa',
+        {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
+        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_load={'owner': 'splor', 'repo': 'despesa', 'target': 'postgres', 'schema': 'despesa'},
+    )
+
+    linktable.linktable_packages([package])
+
+    [call] = capture_load
+    assert call['package'].custom['dpetl_load']['target'] == 'postgres'
+    assert load.get_target_settings(call['package']) == {'target': 'postgres', 'schema': 'linktable'}
+
+
+def test_linktable_packages_describes_comma_delimiter(tmp_path, capture_load):
+    """A fact table with only its key column is still described as comma-delimited,
+    even though the keys contain '|' (which delimiter sniffing would pick)."""
+    rows = ''.join(
+        f'2002,{1000 + i},"CONSTRUCAO, REFORMA {i}"\n' if i % 3 else f'2002,{1000 + i},ACAO {i}\n'
+        for i in range(50)
+    )
+    package = make_package(
+        tmp_path, 'classificadores',
+        {'acao': 'ano,cod,nome\n' + rows},
+        dpetl_linktable={'resource_list': ['acao']},
+    )
+
+    linktable.linktable_packages([package])
+
+    [call] = capture_load
+    for resource in call['package'].resources:
+        assert resource.dialect.get_control('csv').delimiter == ','
+
+    fact = call['package'].get_resource('fact_classificadores_acao')
+    assert [field.name for field in fact.schema.fields] == ['key_classificadores_acao']
+    assert fact.stats.rows == 50
 
 
 # Resources with the same name ------------------------------------------------
@@ -239,16 +281,20 @@ def test_linktable_packages_fails_on_unknown_resource(tmp_path, capture_load, ca
     assert capture_load == []
 
 
-def test_linktable_packages_fails_on_divergent_load_settings(tmp_path, capture_load):
-    """Packages targeting different owners cannot share a linktable repository."""
+@pytest.mark.parametrize('other_load', [
+    {'owner': 'outro', 'repo': 'receita'},
+    {'owner': 'splor', 'repo': 'receita', 'target': 'postgres'},
+])
+def test_linktable_packages_fails_on_divergent_load_settings(tmp_path, capture_load, other_load):
+    """Packages with different owners or targets cannot share a linktable destination."""
     packages = [
         make_package(
             tmp_path, name,
             {name: 'ano,vlr_valor\n2024,100\n'},
             dpetl_linktable={'resource_list': [name]},
-            dpetl_load={'owner': owner, 'repo': name},
+            dpetl_load=dpetl_load,
         )
-        for name, owner in (('despesa', 'splor'), ('receita', 'outro'))
+        for name, dpetl_load in (('despesa', {'owner': 'splor', 'repo': 'despesa'}), ('receita', other_load))
     ]
 
     with pytest.raises(SystemExit):

@@ -2,7 +2,8 @@ import logging
 import tempfile
 import pandas as pd
 from pathlib import Path
-from frictionless import Package, Resource
+from frictionless import Dialect, Package, Resource
+from frictionless.formats import CsvControl
 
 from dpetl.load import github, load
 from dpetl.transform.linktable import build_key, create_linktable, split_fields
@@ -45,24 +46,32 @@ def get_resource_list(package):
     return [package.get_resource(name) for name in resource_list]
 
 
+def get_source_settings(package):
+    """
+    Return the dpetl_load settings a source package shares with the linktable.
+    """
+    repo = github.get_repo_settings(package)
+    target = load.get_target_settings(package)
+
+    return repo['owner'], repo['level'], repo['visibility'], target['target']
+
+
 def get_load_settings(packages):
     """
-    Build the destination repository settings from the source packages.
-    All packages must share the same owner, level and visibility.
+    Build the destination settings from the source packages. All packages
+    must share the same owner, level, visibility and target. With target
+    postgres, the tables go to the schema named after the linktable package.
     """
-    settings = {
-        (s['owner'], s['level'], s['visibility'])
-        for s in map(github.get_repo_settings, packages)
-    }
+    settings = set(map(get_source_settings, packages))
 
     if len(settings) > 1:
         logger.error(
             'Packages in the linktable must share the same "owner", '
-            '"level" and "visibility" in "dpetl_load".'
+            '"level", "visibility" and "target" in "dpetl_load".'
         )
         raise SystemExit(1)
 
-    owner, level, visibility = settings.pop()
+    owner, level, visibility, target = settings.pop()
 
     if not owner:
         logger.error('Missing required field "owner" in "dpetl_load".')
@@ -73,6 +82,7 @@ def get_load_settings(packages):
         'repo': REPO_NAME,
         'level': level,
         'visibility': visibility,
+        'target': target,
     }
 
 
@@ -176,8 +186,11 @@ def linktable_packages(packages, **kwargs):
             package_dimensions, resource_dfs, data_path, basepath
         )
 
+        # Files are written by pandas with ',': sniffing could pick '|'
+        # from the keys (e.g. fact tables with a single key column)
         resources = [*fact_resources, linktable_resource]
         for resource in resources:
+            resource.dialect = Dialect(controls=[CsvControl(delimiter=',')])
             resource.infer(stats=True)
 
 
