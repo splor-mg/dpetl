@@ -14,7 +14,8 @@ from dpetl.load import github, load
 class FakePackage:
     """A minimal stand-in for cases that need a custom config the shared
     dpetl_package fixture doesn't represent (missing/invalid dpetl_load)."""
-    def __init__(self, custom=None, basepath='/tmp'):
+    def __init__(self, custom=None, basepath='/tmp', name='test_pkg'):
+        self.name = name
         self.custom = custom or {}
         self.resources = []
         self._basepath = basepath
@@ -79,6 +80,37 @@ def test_load_package_strips_dpetl_properties(monkeypatch, dpetl_package, scoped
     ]
 
 
+def test_load_package_to_postgres(monkeypatch, dpetl_package, scoped_package):
+    """With target postgres, data goes to the database and only the descriptor is committed."""
+    mock_github(monkeypatch)
+    committed = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: committed.update(files)
+    )
+    loaded = []
+    table = {
+        'name': 'basic',
+        'path': 'postgresql://host:5432/db',
+        'dialect': {'sql': {'table': 'basic', 'namespace': 'dados'}},
+    }
+    monkeypatch.setattr(
+        'dpetl.load.load.postgres.load_tables',
+        lambda package, schema: loaded.append((package.resource_names, schema)) or [table]
+    )
+    package = scoped_package(dpetl_package, 'basic')
+    package.custom['dpetl_load'].update({'target': 'postgres', 'schema': 'dados'})
+
+    load.load_package(package)
+
+    assert loaded == [(['basic'], 'dados')]
+    assert list(committed) == ['datapackage.json']
+
+    descriptor = json.loads(committed['datapackage.json'])
+    assert descriptor['resources'] == [table]
+    assert not [key for key in descriptor if key.startswith('dpetl_')]
+
+
 def test_load_package_local_commit(monkeypatch, tmp_path):
     """When 'repo' isn't set, files are committed locally instead of to GitHub."""
     calls = mock_github(monkeypatch)
@@ -105,6 +137,30 @@ def test_load_package_validation_errors(monkeypatch, custom, missing_field):
 
     with pytest.raises(SystemExit):
         load.load_package(FakePackage(custom=custom))
+
+
+# Tests for get_target_settings ------------------------------------------------
+@pytest.mark.parametrize(('dpetl_load', 'expected'), [
+    ({}, {'target': 'github', 'schema': 'test_pkg'}),
+    ({'target': 'github'}, {'target': 'github', 'schema': 'test_pkg'}),
+    ({'target': 'postgres'}, {'target': 'postgres', 'schema': 'test_pkg'}),
+    ({'target': 'postgres', 'schema': 'dados_siafi'}, {'target': 'postgres', 'schema': 'dados_siafi'}),
+])
+def test_get_target_settings(dpetl_load, expected):
+    """target defaults to github and schema defaults to the package name."""
+    package = FakePackage(custom={'dpetl_load': dpetl_load})
+
+    assert load.get_target_settings(package) == expected
+
+
+def test_get_target_settings_invalid_target(caplog):
+    """An unknown target exits instead of loading somewhere unexpected."""
+    package = FakePackage(custom={'dpetl_load': {'target': 'mysql'}})
+
+    with pytest.raises(SystemExit):
+        load.get_target_settings(package)
+
+    assert 'Field "target" in "dpetl_load" must be one of: github, postgres.' in caplog.text
 
 
 # Tests for _get_token ---------------------------------------------------------

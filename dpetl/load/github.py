@@ -152,9 +152,10 @@ def get_deletions(token, files, owner, repo, **kwargs):
     if not descriptor:
         return set()
 
+    # Only repository files can be deleted (not e.g. postgresql:// tables)
     previous_paths = {
         resource['path'] for resource in json.loads(descriptor).get('resources', [])
-        if 'path' in resource
+        if isinstance(resource.get('path'), str) and '://' not in resource['path']
     }
 
     current_paths = files.keys() - {'datapackage.json'}
