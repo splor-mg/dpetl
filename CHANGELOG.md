@@ -1,3 +1,9 @@
+## 0.18.1 (2026-10-05)
+
+### Fix
+
+- **deps**: cap chardet <6 to silence requests warning
+
 ## 0.18.0 (2026-10-05)
 
 ### Feat
