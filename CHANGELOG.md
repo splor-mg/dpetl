@@ -1,3 +1,9 @@
+## 0.18.2 (2026-10-07)
+
+### Fix
+
+- **load**: retry GitHub API requests on rate limit and server errors
+
 ## 0.18.1 (2026-10-05)
 
 ### Fix
