@@ -37,6 +37,10 @@ Before publishing, the `dpetl_extract`, `dpetl_transform` and `dpetl_load` prope
 
 A single commit publishes the transformed data and the updated `datapackage.json`, keeping the repository in sync with the current package definition.
 
+## Retries and errors
+
+Requests to the GitHub API are retried up to 5 times on rate limits and temporary server errors. If they still fail, the load stops with an `HTTPError` and no commit is made.
+
 ## Example
 
 The `dpetl_load` property is defined once, at the package level. See the [complete example](example.md).
