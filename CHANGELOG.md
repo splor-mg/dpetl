@@ -1,3 +1,9 @@
+## 0.18.3 (2026-10-08)
+
+### Fix
+
+- **transform**: match cli output file by name, ignoring extension
+
 ## 0.18.2 (2026-10-07)
 
 ### Fix
