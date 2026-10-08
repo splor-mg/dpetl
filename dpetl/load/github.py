@@ -5,8 +5,20 @@ import requests
 import subprocess
 import time
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
+
+# Retry rate limits and temporary server errors in every request
+session = requests.Session()
+session.mount('https://', HTTPAdapter(max_retries=Retry(
+    total=5,
+    backoff_factor=2,
+    status_forcelist=(403, 429, 500, 502, 503, 504),
+    allowed_methods=None,
+    raise_on_status=False
+)))
 
 
 def get_repo_settings(package):
@@ -67,7 +79,7 @@ def get_installation_token(app_id, private_key, owner, installation_id=None):
 
     # Discover the installation_id if it was not provided
     if not installation_id:
-        r = requests.get(
+        r = session.get(
             f'https://api.github.com/orgs/{owner}/installation',
             headers=jwt_headers
         )
@@ -77,7 +89,7 @@ def get_installation_token(app_id, private_key, owner, installation_id=None):
         logger.debug(f'Installation ID automatically discovered: {installation_id}')
 
     # Request the Installation Access Token
-    r = requests.post(
+    r = session.post(
         f'https://api.github.com/app/installations/{installation_id}/access_tokens',
         headers=jwt_headers,
     )
@@ -91,7 +103,7 @@ def repo_exists(token, owner, repo, **kwargs):
     Check if a GitHub repository exists for a given owner.
     """
     url = f'https://api.github.com/repos/{owner}/{repo}'
-    r = requests.get(url, headers={'Authorization': f'Bearer {token}'})
+    r = session.get(url, headers={'Authorization': f'Bearer {token}'})
     return r.status_code == 200
 
 
@@ -114,7 +126,7 @@ def create_repo(token, owner, repo, level, visibility, **kwargs):
         'auto_init': True
     }
 
-    r = requests.post(
+    r = session.post(
         url,
         json=payload,
         headers={'Authorization': f'Bearer {token}'}
@@ -132,7 +144,7 @@ def get_remote_descriptor(owner, repo, token):
     Returns None if the repository has no descriptor yet.
     """
     url = f'https://api.github.com/repos/{owner}/{repo}/contents/datapackage.json'
-    r = requests.get(url, headers={'Authorization': f'Bearer {token}'})
+    r = session.get(url, headers={'Authorization': f'Bearer {token}'})
 
     if r.status_code == 404:
         return None
@@ -195,23 +207,25 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     }
 
     # Get repository information
-    r = requests.get(url, headers=headers)
+
+    r = session.get(url, headers=headers)
     check_response(r, f'reading repository {owner}/{repo}')
     branch = r.json()['default_branch']
 
     # Retrieve current HEAD commit and tree
-    r = requests.get(f'{url}/git/refs/heads/{branch}', headers=headers)
+    r = session.get(f'{url}/git/refs/heads/{branch}', headers=headers)
     check_response(r, f'reading branch {branch}')
     sha = r.json()['object']['sha']
 
     r = requests.get(f'{url}/git/commits/{sha}', headers=headers)
     check_response(r, f'reading commit {sha}')
+
     base_tree = r.json()['tree']['sha']
 
     # Create blobs for each file
     items = []
     for path, content in files.items():
-        r = requests.post(
+        r = session.post(
             f'{url}/git/blobs',
             headers=headers,
             json={
@@ -241,7 +255,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
             })
 
     # Build updated file tree
-    r = requests.post(
+    r = session.post(
         f'{url}/git/trees',
         headers=headers,
         json={
@@ -259,7 +273,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     # Create commit with timestamp
     timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
-    r = requests.post(
+    r = session.post(
         f'{url}/git/commits',
         headers=headers,
         json={

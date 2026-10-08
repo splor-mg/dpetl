@@ -1,23 +1,20 @@
-[build-system]
-requires = ['poetry-core>=2.0.0,<3.0.0']
-build-backend = 'poetry.core.masonry.api'
-
 [project]
 name = 'dpetl'
-version = "0.17.0"
+version = "0.18.3"
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
 ]
 readme = 'README.md'
-requires-python = '>=3.10,<4.0'
+requires-python = '>=3.13,<4.0'
 dependencies = [
     'taskipy (>=1.14.1,<2.0.0)',
     'python-dotenv (>=1.2.1,<2.0.0)',
     'imap-tools (>=1.11.1,<2.0.0)',
     'frictionless[pandas] (>=5.18.1,<6.0.0)',
     'pysocks (>=1.7.1,<2.0.0)',
-    'tqdm (>=4.67.3,<5.0.0)'
+    'tqdm (>=4.67.3,<5.0.0)',
+    'chardet (>=5.2.0,<6.0.0)'
 ]
 
 [project.optional-dependencies]
@@ -40,13 +37,10 @@ dpetl = 'dpetl.cli:app'
 [tool.repo-template]
 upstream = 'https://github.com/splor-mg/repo-template-python.git'
 
-[tool.commitizen]
-name = 'cz_conventional_commits'
-tag_format = '$version'
-version_scheme = 'pep440'
-version_provider = 'pep621'
-update_changelog_on_bump = true
-major_version_zero = true
+[build-system]
+requires = ['poetry-core>=2.0.0,<3.0.0']
+build-backend = 'poetry.core.masonry.api'
+
 [dependency-groups]
 dev = [
     'ipdb (>=0.13.13,<0.14.0)',
@@ -58,6 +52,19 @@ dev = [
     'setuptools (<81)',
     'commitizen (>=4.17.0,<5.0.0)'
 ]
+docs = [
+    "zensical (>=0.0.67,<0.0.68)",
+    "mkdocstrings-python (>=2.0.9,<3.0.0)",
+    "jinja2 (>=3.1.6,<4.0.0)"
+]
+
+[tool.commitizen]
+name = 'cz_conventional_commits'
+tag_format = '$version'
+version_scheme = 'pep440'
+version_provider = 'pep621'
+update_changelog_on_bump = true
+major_version_zero = true
 
 [tool.poetry]
 packages = [{ include = 'dpetl' }]
@@ -87,5 +94,7 @@ test_debug = { cmd = 'pytest -s -x -vv', help = 'Runs unit tests in debug mode.'
 coverage_html = { cmd = 'coverage html', help = 'Generates an HTML coverage report.' }
 coverage_badge = { cmd = 'coverage-badge -o coverage.svg -f', help = 'Generates the README coverage badge.' }
 check = { cmd = 'task lint && task test', help = 'Runs lint and tests.' }
+serve = { cmd = 'zensical serve', help = 'Serves the documentation site locally.' }
+build = { cmd = 'zensical build --clean', help = 'Builds the documentation site.' }
 bump = { cmd = 'cz bump', help = 'Bumps project version.' }
 publish = { cmd = 'task bump && dotenv run poetry publish --build -n && git push origin main --tags', help = 'Bumps version and publish the package on Pypi.' }

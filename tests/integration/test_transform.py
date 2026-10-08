@@ -1,11 +1,15 @@
 """
 Integration tests for the transformation module.
 """
-import pytest
+import json
+import os
 import subprocess
-from pathlib import Path
-import petl as etl
 import pandas as pd
+import petl as etl
+import pytest
+
+from pathlib import Path
+
 from frictionless import Package, Resource
 
 from dpetl.transform import command, datapackage, transform
@@ -106,7 +110,7 @@ def test_transform_package_runs_cli(dpetl_package, scoped_package, monkeypatch):
     cli_calls = []
     monkeypatch.setattr(
         'dpetl.transform.transform.command.check_cli_commands',
-        lambda resource, **k: cli_calls.append(resource.name)
+        lambda resource, table, **k: cli_calls.append(resource.name)
     )
 
     package = scoped_package(dpetl_package, 'cli_resource')
@@ -199,6 +203,7 @@ def test_get_output_settings_full_config():
         'cli': None,
         'pre_process': True,
         'package_linktable': False,
+        'stdin': False,
     }
 
 
@@ -216,6 +221,7 @@ def test_get_output_settings_defaults():
         'cli': None,
         'pre_process': True,
         'package_linktable': False,
+        'stdin': False,
     }
 
 
@@ -343,12 +349,30 @@ def test_update_metadata_with_cli_non_table_falls_back_to_format(tmp_path):
     assert resource.format == 'csv'
 
 
-# Tests for check_cli_commands / run_cli_command -------------------------------
+# Tests for build_stdin_data / check_cli_commands / run_cli_command ------------
+def test_build_stdin_data_returns_none_when_stdin_disabled():
+    """No data is built when stdin mode is off, even with a table present."""
+    table = etl.wrap([['col1'], ['valor1']])
+    assert command.build_stdin_data(table, False, 'utf-8', ',') is None
+
+
+def test_build_stdin_data_returns_none_when_table_is_none():
+    """No data is built when there's no table to serialize, even with stdin on."""
+    assert command.build_stdin_data(None, True, 'utf-8', ',') is None
+
+
+def test_build_stdin_data_serializes_table_as_csv():
+    """With stdin on and a table present, the table is serialized as CSV bytes."""
+    table = etl.wrap([['col1', 'col2'], ['a', 'b']])
+    data = command.build_stdin_data(table, True, 'utf-8', ';')
+    assert data == b'col1;col2\r\na;b\r\n'
+
+
 def test_check_cli_commands_missing_arguments(caplog):
     """No dpetl_transform.cli.arguments logs an error and does nothing."""
     resource = type('Resource', (), {'name': 'test', 'custom': {'dpetl_transform': {'cli': {}}}})()
 
-    command.check_cli_commands(resource)
+    command.check_cli_commands(resource, None, False, 'utf-8', ',')
 
     assert 'Missing required dpetl_transform.cli.arguments' in caplog.text
 
@@ -361,18 +385,46 @@ def test_check_cli_commands_runs_each_argument(monkeypatch):
     })()
 
     calls = []
-    monkeypatch.setattr('dpetl.transform.command.run_cli_command', lambda cmd, res, **k: calls.append(cmd))
+    monkeypatch.setattr('dpetl.transform.command.run_cli_command', lambda cmd, res, data, **k: calls.append(cmd))
 
-    command.check_cli_commands(resource)
+    command.check_cli_commands(resource, None, False, 'utf-8', ',')
 
     assert calls == ['cmd1', 'cmd2']
+
+
+def test_check_cli_commands_pipes_stdin_data(monkeypatch):
+    """When stdin is enabled, the built data reaches run_cli_command."""
+    resource = type('Resource', (), {
+        'name': 'test',
+        'custom': {'dpetl_transform': {'cli': {'arguments': ['cmd1']}}},
+    })()
+    table = etl.wrap([['col1'], ['valor1']])
+
+    received = []
+    monkeypatch.setattr('dpetl.transform.command.run_cli_command', lambda cmd, res, data, **k: received.append(data))
+
+    command.check_cli_commands(resource, table, True, 'utf-8', ',')
+
+    assert received == [b'col1\r\nvalor1\r\n']
+
+
+def test_run_cli_command_pipes_data_to_subprocess(monkeypatch):
+    """The data argument is forwarded to subprocess.run as input."""
+    captured = {}
+    def fake_run(cmd, input=None, check=True, **kwargs):
+        captured['input'] = input
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    command.run_cli_command('cmd', type('Resource', (), {'name': 'test'})(), b'dados')
+
+    assert captured['input'] == b'dados'
 
 
 def test_run_cli_command_success(caplog):
     """A successful command just logs that it ran."""
     caplog.set_level('DEBUG')
 
-    command.run_cli_command('echo "ok"', type('Resource', (), {'name': 'test'})())
+    command.run_cli_command('echo "ok"', type('Resource', (), {'name': 'test'})(), None)
 
     assert 'Running command:' in caplog.text
 
@@ -383,7 +435,7 @@ def test_run_cli_command_called_process_error(monkeypatch, caplog):
         raise subprocess.CalledProcessError(1, cmd)
     monkeypatch.setattr(subprocess, 'run', fake_run)
 
-    command.run_cli_command('failing-command', type('Resource', (), {'name': 'test'})())
+    command.run_cli_command('failing-command', type('Resource', (), {'name': 'test'})(), None)
 
     assert 'CLI command failed for resource test' in caplog.text
 
@@ -394,9 +446,82 @@ def test_run_cli_command_file_not_found(monkeypatch, caplog):
         raise FileNotFoundError("No such file: 'nonexistent'")
     monkeypatch.setattr(subprocess, 'run', fake_run)
 
-    command.run_cli_command('nonexistent', type('Resource', (), {'name': 'test'})())
+    command.run_cli_command('nonexistent', type('Resource', (), {'name': 'test'})(), None)
 
     assert "CLI command not found for resource test" in caplog.text
+
+
+def _cli_resource(custom):
+    package = type('Package', (), {'custom': custom})()
+    return type('Resource', (), {'name': 'test', 'package': package})()
+
+
+@pytest.mark.parametrize('custom', [
+    {'dpetl_load': {'owner': 'splor-mg'}},
+    {'custom': []},
+    {'custom': {}},
+])
+def test_run_cli_command_omits_env_without_custom(monkeypatch, custom):
+    """No custom block omits env so the child inherits the parent."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    command.run_cli_command('cmd', _cli_resource(custom), None)
+
+    assert captured['env'] is None
+
+
+def test_run_cli_command_injects_list_of_maps_custom(monkeypatch):
+    """List-of-maps custom becomes JSON env vars on the child only."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    sources = [{'id': 'relatorios', 'source': 'https://example.com/repo.git'}]
+    flows = [{'id': 'receita', 'rules': ['is_asps_rec']}]
+    resource = _cli_resource({
+        'dpetl_load': {'owner': 'splor-mg'},
+        'custom': [{'sources': sources}, {'flows': flows}],
+    })
+
+    command.run_cli_command('cmd', resource, None)
+
+    env = captured['env']
+    assert json.loads(env['sources']) == sources
+    assert json.loads(env['flows']) == flows
+    assert 'dpetl_load' not in env
+    assert 'sources' not in os.environ
+    assert 'flows' not in os.environ
+
+
+def test_run_cli_command_injects_mapping_custom(monkeypatch):
+    """A mapping custom block is JSON-encoded like a list of maps."""
+    captured = {}
+
+    def fake_run(cmd, input=None, env=None, check=True, **kwargs):
+        captured['env'] = env
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+
+    sources = [{'id': 'relatorios', 'source': 'https://example.com/repo.git'}]
+    flows = [{'id': 'receita', 'rules': ['is_asps_rec']}]
+    resource = _cli_resource({
+        'custom': {'sources': sources, 'flows': flows, 'extra': {'k': 1}},
+    })
+
+    command.run_cli_command('cmd', resource, None)
+
+    env = captured['env']
+    assert json.loads(env['sources']) == sources
+    assert json.loads(env['flows']) == flows
+    assert json.loads(env['extra']) == {'k': 1}
 
 
 # Tests for build_datapackage --------------------------------------------------

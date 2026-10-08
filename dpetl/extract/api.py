@@ -3,7 +3,12 @@ from pathlib import Path
 from tqdm import tqdm
 
 def check_multipart_files(resource, **kwargs):
+    """
+    Download every file of an API resource.
 
+    The base URL in `sources` is combined with the file name of
+    `resource.path` and of each one of `resource.extrapaths`.
+    """
     url = resource.sources[0]['path']
     file_name = resource.path.split('/')[-1]
     new_url = f'{url}/{file_name}'
@@ -20,6 +25,9 @@ def check_multipart_files(resource, **kwargs):
             extract_api(resource, **kwargs)
 
 def extract_api(resource, **kwargs):
+    """
+    Request the resource source and save the response to `resource.path`.
+    """
     try:
         source = resource.sources[0]
         if source:

@@ -204,7 +204,7 @@ def test_get_token_missing_credentials(monkeypatch):
 ])
 def test_repo_exists(monkeypatch, status_code, expected):
     """repo_exists reflects the HTTP status code."""
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: SimpleNamespace(status_code=status_code))
+    monkeypatch.setattr(github.session, 'get', lambda *a, **k: SimpleNamespace(status_code=status_code))
 
     assert github.repo_exists('token', 'owner', 'repo') is expected
 
@@ -233,7 +233,7 @@ def test_create_repo(monkeypatch, level, expected_url):
         captured['payload'] = json
         return MockResponse()
 
-    monkeypatch.setattr(requests, 'post', mock_post)
+    monkeypatch.setattr(github.session, 'post', mock_post)
 
     github.create_repo('token', 'owner', 'repo', level, 'private')
 
@@ -254,7 +254,7 @@ def test_create_repo_api_error(monkeypatch, caplog):
         def raise_for_status(self):
             raise requests.exceptions.HTTPError()
 
-    monkeypatch.setattr(requests, 'post', lambda *a, **k: MockResponse())
+    monkeypatch.setattr(github.session, 'post', lambda *a, **k: MockResponse())
 
     with pytest.raises(requests.exceptions.HTTPError):
         github.create_repo('token', 'owner', 'repo', 'user', 'private')
@@ -307,9 +307,9 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             return failed(url)
         return SimpleNamespace(ok=True, status_code=200, raise_for_status=lambda: None)
 
-    monkeypatch.setattr(requests, 'get', mock_get)
-    monkeypatch.setattr(requests, 'post', mock_post)
-    monkeypatch.setattr(requests, 'patch', mock_patch)
+    monkeypatch.setattr(github.session, 'get', mock_get)
+    monkeypatch.setattr(github.session, 'post', mock_post)
+    monkeypatch.setattr(github.session, 'patch', mock_patch)
     return patch_called
 
 
@@ -358,6 +358,31 @@ def test_commit_remote_no_changes(monkeypatch):
     github.commit_remote('token', files, set(), owner='owner', repo='repo')
 
     assert patch_called == []
+
+
+def test_commit_remote_blob_error(monkeypatch):
+    """A rejected blob upload raises HTTPError instead of failing on the missing sha."""
+    mock_git_api(monkeypatch)
+
+    def mock_post(url, headers=None, json=None):
+        def raise_for_status():
+            raise requests.exceptions.HTTPError()
+        return SimpleNamespace(status_code=403, raise_for_status=raise_for_status)
+
+    monkeypatch.setattr(github.session, 'post', mock_post)
+
+    with pytest.raises(requests.exceptions.HTTPError):
+        github.commit_remote('token', {'a.txt': b'x'}, set(), owner='owner', repo='repo')
+
+
+def test_session_retries_rate_limit_and_server_errors():
+    """The shared session retries rate limits and server errors, including POST and PATCH."""
+    retry = github.session.get_adapter('https://api.github.com').max_retries
+
+    assert retry.total == 5
+    assert retry.is_retry('POST', 403)
+    assert retry.is_retry('PATCH', 502)
+    assert not retry.is_retry('GET', 404)
 
 
 # Tests for github.commit_local ------------------------------------------------

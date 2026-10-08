@@ -1,21 +1,29 @@
-name: Tests
+name: Documentation
 
 on:
   push:
+    branches:
+      - main
     paths-ignore:
       - coverage.svg
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
+  pages: write
+  id-token: write
   issues: write
+  actions: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  tests:
-    name: Run automated tests
+  build:
+    name: Build site
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.actor, '[bot]') }}
+    if: ${{ !contains(github.actor, '[bot]') && github.ref == 'refs/heads/main' }}
     steps:
       - name: Get job ID
         id: job_id
@@ -24,13 +32,11 @@ jobs:
         run: |
           JOB_ID=$(gh api \
             /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs \
-            --jq '.jobs[0].id')
+            --jq '[.jobs[] | select(.status=="in_progress")][0].id')
           echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up python
         id: setup-python
@@ -50,14 +56,19 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}-github-app
+          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}-docs
 
-      - name: Install dependencies
+      - name: Install docs dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --extras "github-app postgres"
+        run: poetry install --no-interaction --with docs --no-root
 
-      - name: Run tests
-        run: poetry run task test
+      - name: Build site
+        run: poetry run task build
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
 
       - name: Workflow failure notification
         if: failure()
@@ -70,3 +81,16 @@ jobs:
           WORKFLOW_NAME: ${{ github.workflow }}
         with:
           filename: .github/failure.md
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.actor, '[bot]') && github.ref == 'refs/heads/main' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

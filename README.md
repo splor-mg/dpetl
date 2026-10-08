@@ -10,25 +10,17 @@ It is designed to work alongside the [Data Package standard specification](https
 
 ## Installation
 
-It requires Python 3.10 or more. Install:
+It requires Python 3.10 or more.
 
 ```bash
-# using pip
+# Install:
 pip install dpetl
 
-# using poetry
 poetry add dpetl
-```
 
-### Optional dependencies
-
-For GitHub App authentication, install with:
-
-```bash
-# using pip
+# Optional dependencies
 pip install dpetl[github-app]
 
-# using poetry
 poetry install --extras github-app
 ```
 
@@ -46,24 +38,26 @@ Extras can be combined, e.g. `dpetl[github-app,postgres]`.
 
 ## Usage
 
-Activate your virtual environment!
+## Usage
 
-Use the `--help` flag to inspect the CLI documentation:
+Use `dpetl --help` to inspect the CLI.
 
 ```bash
-dpetl --help
+dpetl extract    # download the data (modes: api, email, cli)
+dpetl transform  # rename fields, anonymize values and export the files
+dpetl load       # publish the data to a GitHub repository
 ```
 
 
-## How It Works
+## How it works
 
-The CLI loads Data Package descriptor(s) (via the `frictionless-py` Python package) and iterates over its resources.
-
-By default, the CLI looks for:
+The CLI reads the Data Package descriptor:
 
 - `datapackage.yaml` when running `extract` or `transform`
 
 - `datapackage.json` when running `load` or `linktable`
+
+Then it runs each phase on its resources, following the `dpetl_extract`, `dpetl_transform` and `dpetl_load` properties declared in it.
 
 If you have **multiple data packages**, place them in a `datapackages/` folder (each in its own subdirectory) and dpetl will process all of them.
 
@@ -529,11 +523,6 @@ All variables above can also be set in a `.env` file in the current directory in
 
 **\* Proxy notes:** If your network requires a proxy, dpetl supports both uppercase and lowercase proxy environment variables. Use the format `http://user:pwd@host:port` when authentication is required.
 
+## Documentation
 
-## Design Philosophy
-
-The `dpetl` package follows a [convention over configuration](https://en.wikipedia.org/wiki/Convention_over_configuration) philosophy, treating the Data Package descriptor as the single source of truth for ETL process.
-
-Each resource declares how it should be processed through structured metadata, enabling reproducible, declarative, and version-controlled data workflows.
-
-The goal is to keep the CLI simple while allowing flexible strategies driven entirely by configuration rather than imperative scripting.
+Full documentation, with a page for each phase, the descriptor details and the API reference, at <https://splor-mg.github.io/dpetl/>.

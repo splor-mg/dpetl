@@ -32,7 +32,7 @@ def test_get_installation_token_with_installation_id(monkeypatch):
     """Success when installation_id is provided directly."""
     import jwt
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
-    monkeypatch.setattr(requests, 'post', lambda url, headers: mock_response(201, {'token': 'fake_install_token'}))
+    monkeypatch.setattr(github.session, 'post', lambda url, headers: mock_response(201, {'token': 'fake_install_token'}))
 
     token = github.get_installation_token('123', 'key', 'owner', '456')
 
@@ -45,8 +45,8 @@ def test_get_installation_token_auto_discovery(monkeypatch):
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
 
     calls = []
-    monkeypatch.setattr(requests, 'get', lambda url, headers: calls.append(('GET', url)) or mock_response(200, {'id': 789}))
-    monkeypatch.setattr(requests, 'post', lambda url, headers: calls.append(('POST', url)) or mock_response(201, {'token': 'fake_token'}))
+    monkeypatch.setattr(github.session, 'get', lambda url, headers: calls.append(('GET', url)) or mock_response(200, {'id': 789}))
+    monkeypatch.setattr(github.session, 'post', lambda url, headers: calls.append(('POST', url)) or mock_response(201, {'token': 'fake_token'}))
 
     github.get_installation_token('123', 'key', 'owner')
 
@@ -58,7 +58,7 @@ def test_get_installation_token_request_failure(monkeypatch):
     """An HTTP error during discovery propagates instead of being swallowed."""
     import jwt
     monkeypatch.setattr(jwt, 'encode', lambda *a, **k: 'fake_jwt')
-    monkeypatch.setattr(requests, 'get', lambda *a, **k: mock_response(404, raises=True))
+    monkeypatch.setattr(github.session, 'get', lambda *a, **k: mock_response(404, raises=True))
 
     with pytest.raises(requests.exceptions.HTTPError):
         github.get_installation_token('123', 'key', 'owner')
@@ -92,7 +92,7 @@ def test_get_repo_settings_invalid(dpetl_load):
 # Tests for get_remote_descriptor / get_local_descriptor -----------------------
 def test_get_remote_descriptor_not_found(monkeypatch):
     """A 404 means no descriptor exists yet, returned as None."""
-    monkeypatch.setattr(requests, 'get', lambda url, headers: mock_response(404))
+    monkeypatch.setattr(github.session, 'get', lambda url, headers: mock_response(404))
 
     assert github.get_remote_descriptor('owner', 'repo', 'token') is None
 
@@ -100,7 +100,7 @@ def test_get_remote_descriptor_not_found(monkeypatch):
 def test_get_remote_descriptor_success(monkeypatch):
     """The base64-encoded content from the GitHub API is decoded."""
     content = base64.b64encode(b'{"resources": []}').decode()
-    monkeypatch.setattr(requests, 'get', lambda url, headers: mock_response(200, {'content': content}))
+    monkeypatch.setattr(github.session, 'get', lambda url, headers: mock_response(200, {'content': content}))
 
     assert github.get_remote_descriptor('owner', 'repo', 'token') == b'{"resources": []}'
 

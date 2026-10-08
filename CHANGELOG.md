@@ -1,3 +1,28 @@
+## 0.18.3 (2026-10-08)
+
+### Fix
+
+- **transform**: match cli output file by name, ignoring extension
+
+## 0.18.2 (2026-10-07)
+
+### Fix
+
+- **load**: retry GitHub API requests on rate limit and server errors
+
+## 0.18.1 (2026-10-05)
+
+### Fix
+
+- **deps**: cap chardet <6 to silence requests warning
+
+## 0.18.0 (2026-10-05)
+
+### Feat
+
+- **dpetl-transform**: custom env variables injection to cli subprocess via transform
+- **transform**: pipe built-in pipeline output to cli commands via stdin
+
 ## 0.17.0 (2026-09-09)
 
 ### Feat
