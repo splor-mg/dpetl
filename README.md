@@ -38,8 +38,6 @@ Extras can be combined, e.g. `dpetl[github-app,postgres]`.
 
 ## Usage
 
-## Usage
-
 Use `dpetl --help` to inspect the CLI.
 
 ```bash
