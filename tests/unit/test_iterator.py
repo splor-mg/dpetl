@@ -100,6 +100,37 @@ def test_descriptor_iteration_with_datapackages_folder(monkeypatch, tmp_path):
     assert sorted(calls) == ['pkg_from_pkg1', 'pkg_from_pkg2']
 
 
+def test_descriptor_iteration_linktable_receives_all_packages_at_once(monkeypatch, tmp_path):
+    """operation='linktable' reads every datapackage.json and dispatches them in a single call."""
+    for name in ('pkg1', 'pkg2'):
+        path = tmp_path / 'datapackages' / name / 'datapackage.json'
+        path.parent.mkdir(parents=True)
+        path.touch()
+    monkeypatch.chdir(tmp_path)
+
+    monkeypatch.setattr('dpetl.helpers.iterator.Package', lambda path: Package(name=f'pkg_from_{path.parent.name}'))
+    calls = []
+    monkeypatch.setattr(
+        'dpetl.linktable.linktable.linktable_packages',
+        lambda packages, **k: calls.append(sorted(package.name for package in packages))
+    )
+
+    descriptor_iteration(operation='linktable')
+
+    assert calls == [['pkg_from_pkg1', 'pkg_from_pkg2']]
+
+
+def test_descriptor_iteration_linktable_skips_when_no_descriptor(monkeypatch, tmp_path, caplog):
+    """Without any descriptor, linktable logs an error and is not called."""
+    monkeypatch.chdir(tmp_path)
+    calls = track_calls(monkeypatch, 'dpetl.linktable.linktable.linktable_packages')
+
+    descriptor_iteration(operation='linktable')
+
+    assert calls == []
+    assert 'No descriptor found.' in caplog.text
+
+
 # Tests for resources_iteration - package-level enable/disable -----------------
 @pytest.mark.parametrize('custom', [
     {'dpetl_extract': {'enabled': False}},

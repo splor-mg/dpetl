@@ -137,6 +137,16 @@ def test_get_deletions(monkeypatch, mocked_function, kwargs):
     assert deletions == {'old_file.csv', 'removed_file.csv'}
 
 
+def test_get_deletions_ignores_non_file_paths(monkeypatch):
+    """Resources stored elsewhere (e.g. Postgres tables) are not repository files to delete."""
+    descriptor = b'{"resources": [{"path": "postgresql://host:5432/db"}, {"path": "data/old.csv"}]}'
+    monkeypatch.setattr(github, 'get_remote_descriptor', lambda *a, **k: descriptor)
+
+    deletions = github.get_deletions('token', {'datapackage.json': b''}, owner='owner', repo='repo')
+
+    assert deletions == {'data/old.csv'}
+
+
 def test_get_deletions_no_previous_descriptor(monkeypatch):
     """No previous descriptor (e.g. first-ever load) means nothing to delete."""
     monkeypatch.setattr(github, 'get_remote_descriptor', lambda *a, **k: None)
