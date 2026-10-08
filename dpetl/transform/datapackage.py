@@ -57,7 +57,7 @@ def update_metadata(resource, path, format, compression, extension, delimiter, c
         directory = Path(basepath) / (cli.get('path') or path)
 
         for output in directory.iterdir():
-            if output.is_file() and output.stem.lower() == resource.name:
+            if output.is_file() and output.name.split('.')[0].lower() == resource.name:
                 break
 
         relative_path = str(output.relative_to(basepath))
