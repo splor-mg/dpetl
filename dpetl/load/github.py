@@ -207,7 +207,6 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     }
 
     # Get repository information
-
     r = session.get(url, headers=headers)
     check_response(r, f'reading repository {owner}/{repo}')
     branch = r.json()['default_branch']
@@ -217,7 +216,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     check_response(r, f'reading branch {branch}')
     sha = r.json()['object']['sha']
 
-    r = requests.get(f'{url}/git/commits/{sha}', headers=headers)
+    r = session.get(f'{url}/git/commits/{sha}', headers=headers)
     check_response(r, f'reading commit {sha}')
 
     base_tree = r.json()['tree']['sha']
@@ -286,7 +285,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
     new_commit = r.json()
 
     # Update branch to new commit
-    r = requests.patch(
+    r = session.patch(
         f'{url}/git/refs/heads/{branch}',
         headers=headers,
         json={'sha': new_commit['sha']}
