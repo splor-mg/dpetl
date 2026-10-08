@@ -367,7 +367,11 @@ def test_commit_remote_blob_error(monkeypatch):
     def mock_post(url, headers=None, json=None):
         def raise_for_status():
             raise requests.exceptions.HTTPError()
-        return SimpleNamespace(status_code=403, raise_for_status=raise_for_status)
+        return SimpleNamespace(
+            ok=False, status_code=403, text='',
+            json=lambda: {'message': 'Forbidden'},
+            raise_for_status=raise_for_status,
+        )
 
     monkeypatch.setattr(github.session, 'post', mock_post)
 
