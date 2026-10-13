@@ -1,3 +1,9 @@
+## 0.18.4 (2026-10-13)
+
+### Fix
+
+- **cli**: set chardet logger level to WARNING
+
 ## 0.18.3 (2026-10-08)
 
 ### Fix
