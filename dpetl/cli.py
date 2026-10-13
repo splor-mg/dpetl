@@ -35,6 +35,7 @@ def setup_logging(verbose: bool, quiet: bool):
         datefmt='%Y-%m-%d %H:%M:%S',
         handlers=handlers,
     )
+    logging.getLogger('chardet').setLevel(logging.WARNING)
 
 
 def version_callback(value: bool):
