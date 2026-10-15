@@ -1,5 +1,5 @@
 """
-Integration tests for CLI commands: extract, transform, load.
+Integration tests for CLI commands: extract, transform, load, linktable.
 Tests both command dispatching (via mocks) and the full integration flow.
 """
 import re
@@ -31,9 +31,9 @@ def test_extract_command_flags(mock_descriptor_iteration, args, expected):
         assert kwargs[key] == value
 
 
-@pytest.mark.parametrize('command', ['transform', 'load'])
+@pytest.mark.parametrize('command', ['transform', 'load', 'linktable'])
 def test_command_calls_descriptor_iteration(mock_descriptor_iteration, command):
-    """transform/load dispatch to descriptor_iteration with the matching operation."""
+    """transform/load/linktable dispatch to descriptor_iteration with the matching operation."""
     result = runner.invoke(app, [command], obj={'no_validate': True, 'no_stop': True})
 
     assert result.exit_code == 0

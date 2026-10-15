@@ -6,7 +6,7 @@ By default, the CLI looks for:
 
 - `datapackage.yaml` when running `extract` or `transform`
 
-- `datapackage.json` when running `load`
+- `datapackage.json` when running `load` or `linktable`
 
 If you have **multiple data packages**, place them in a `datapackages/` folder (each in its own subdirectory) and dpetl will process all of them.
 

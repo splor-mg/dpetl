@@ -2,6 +2,7 @@
 Integration tests for the load module:
 GitHub repository operations, authentication, and commit handling.
 """
+import json
 import pytest
 import requests
 import subprocess
@@ -13,7 +14,8 @@ from dpetl.load import github, load
 class FakePackage:
     """A minimal stand-in for cases that need a custom config the shared
     dpetl_package fixture doesn't represent (missing/invalid dpetl_load)."""
-    def __init__(self, custom=None, basepath='/tmp'):
+    def __init__(self, custom=None, basepath='/tmp', name='test_pkg'):
+        self.name = name
         self.custom = custom or {}
         self.resources = []
         self._basepath = basepath
@@ -57,6 +59,58 @@ def test_load_package_repo_creation(monkeypatch, dpetl_package, scoped_package):
     assert calls == ['repo_exists', 'create_repo', 'validate', 'get_deletions', 'commit_remote']
 
 
+def test_load_package_strips_dpetl_properties(monkeypatch, dpetl_package, scoped_package):
+    """dpetl_* settings (including dpetl_linktable) are not published in datapackage.json."""
+    mock_github(monkeypatch)
+    committed = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: committed.update(files)
+    )
+    package = scoped_package(dpetl_package, 'basic')
+    package.custom['dpetl_linktable'] = {'resource_list': ['basic']}
+
+    load.load_package(package)
+
+    descriptor = json.loads(committed['datapackage.json'])
+    assert not [key for key in descriptor if key.startswith('dpetl_')]
+    assert not [
+        key for resource in descriptor['resources']
+        for key in resource if key.startswith('dpetl_')
+    ]
+
+
+def test_load_package_to_postgres(monkeypatch, dpetl_package, scoped_package):
+    """With target postgres, data goes to the database and only the descriptor is committed."""
+    mock_github(monkeypatch)
+    committed = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: committed.update(files)
+    )
+    loaded = []
+    table = {
+        'name': 'basic',
+        'path': 'postgresql://host:5432/db',
+        'dialect': {'sql': {'table': 'basic', 'namespace': 'dados'}},
+    }
+    monkeypatch.setattr(
+        'dpetl.load.load.postgres.load_tables',
+        lambda package, schema: loaded.append((package.resource_names, schema)) or [table]
+    )
+    package = scoped_package(dpetl_package, 'basic')
+    package.custom['dpetl_load'].update({'target': 'postgres', 'schema': 'dados'})
+
+    load.load_package(package)
+
+    assert loaded == [(['basic'], 'dados')]
+    assert list(committed) == ['datapackage.json']
+
+    descriptor = json.loads(committed['datapackage.json'])
+    assert descriptor['resources'] == [table]
+    assert not [key for key in descriptor if key.startswith('dpetl_')]
+
+
 def test_load_package_local_commit(monkeypatch, tmp_path):
     """When 'repo' isn't set, files are committed locally instead of to GitHub."""
     calls = mock_github(monkeypatch)
@@ -83,6 +137,30 @@ def test_load_package_validation_errors(monkeypatch, custom, missing_field):
 
     with pytest.raises(SystemExit):
         load.load_package(FakePackage(custom=custom))
+
+
+# Tests for get_target_settings ------------------------------------------------
+@pytest.mark.parametrize(('dpetl_load', 'expected'), [
+    ({}, {'target': 'github', 'schema': 'test_pkg'}),
+    ({'target': 'github'}, {'target': 'github', 'schema': 'test_pkg'}),
+    ({'target': 'postgres'}, {'target': 'postgres', 'schema': 'test_pkg'}),
+    ({'target': 'postgres', 'schema': 'dados_siafi'}, {'target': 'postgres', 'schema': 'dados_siafi'}),
+])
+def test_get_target_settings(dpetl_load, expected):
+    """target defaults to github and schema defaults to the package name."""
+    package = FakePackage(custom={'dpetl_load': dpetl_load})
+
+    assert load.get_target_settings(package) == expected
+
+
+def test_get_target_settings_invalid_target(caplog):
+    """An unknown target exits instead of loading somewhere unexpected."""
+    package = FakePackage(custom={'dpetl_load': {'target': 'mysql'}})
+
+    with pytest.raises(SystemExit):
+        load.get_target_settings(package)
+
+    assert 'Field "target" in "dpetl_load" must be one of: github, postgres.' in caplog.text
 
 
 # Tests for _get_token ---------------------------------------------------------
@@ -185,11 +263,21 @@ def test_create_repo_api_error(monkeypatch, caplog):
 
 
 # Tests for github.commit_remote -----------------------------------------------
-def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=False):
-    """Mocks the GitHub git-data API sequence commit_remote walks through."""
+def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=False, fail_on=None):
+    """Mocks the GitHub git-data API sequence commit_remote walks through.
+    'fail_on' makes requests to URLs containing it fail like a GitHub error."""
     patch_called = []
 
+    def failed(url):
+        return SimpleNamespace(
+            ok=False, status_code=422, text='',
+            json=lambda: {'message': 'GitHub refused it'},
+            raise_for_status=lambda: (_ for _ in ()).throw(requests.exceptions.HTTPError(url)),
+        )
+
     def mock_get(url, headers=None):
+        if fail_on and fail_on in url:
+            return failed(url)
         if url == 'https://api.github.com/repos/owner/repo':
             data = {'default_branch': 'main'}
         elif '/git/refs/heads/' in url:
@@ -198,9 +286,11 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             data = {'tree': {'sha': 'base_tree_sha'}}
         else:
             data = {}
-        return SimpleNamespace(status_code=200, json=lambda: data, raise_for_status=lambda: None)
+        return SimpleNamespace(ok=True, status_code=200, json=lambda: data, raise_for_status=lambda: None)
 
     def mock_post(url, headers=None, json=None):
+        if fail_on and fail_on in url:
+            return failed(url)
         if '/git/trees' in url:
             if check_tree_deletion:
                 assert any(item.get('sha') is None for item in json.get('tree', []))
@@ -209,11 +299,13 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             sha = 'blob_sha'
         else:
             sha = 'new_commit_sha'
-        return SimpleNamespace(status_code=201, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
+        return SimpleNamespace(ok=True, status_code=201, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
 
     def mock_patch(url, headers=None, json=None):
         patch_called.append(True)
-        return SimpleNamespace(status_code=200, raise_for_status=lambda: None)
+        if fail_on == 'patch':
+            return failed(url)
+        return SimpleNamespace(ok=True, status_code=200, raise_for_status=lambda: None)
 
     monkeypatch.setattr(github.session, 'get', mock_get)
     monkeypatch.setattr(github.session, 'post', mock_post)
@@ -229,6 +321,23 @@ def test_commit_remote(monkeypatch):
     github.commit_remote('token', files, set(), owner='owner', repo='repo')
 
     assert patch_called == [True]
+
+
+@pytest.mark.parametrize('fail_on, action', [
+    ('/git/refs/heads/', 'reading branch main'),
+    ('/git/blobs', 'uploading big.csv (0.0 MB)'),
+    ('/git/trees', 'creating the file tree'),
+    ('patch', 'updating branch main'),
+])
+def test_commit_remote_reports_github_errors(monkeypatch, caplog, fail_on, action):
+    """A refused request stops the commit and logs GitHub's message with the failed step."""
+    mock_git_api(monkeypatch, tree_sha='new_tree_sha', fail_on=fail_on)
+
+    with pytest.raises(requests.exceptions.HTTPError):
+        github.commit_remote('token', {'big.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    assert f'GitHub API error while {action}: 422 GitHub refused it' in caplog.text
+    assert 'Successfully committed' not in caplog.text
 
 
 def test_commit_remote_with_deletions(monkeypatch):
@@ -258,7 +367,11 @@ def test_commit_remote_blob_error(monkeypatch):
     def mock_post(url, headers=None, json=None):
         def raise_for_status():
             raise requests.exceptions.HTTPError()
-        return SimpleNamespace(status_code=403, raise_for_status=raise_for_status)
+        return SimpleNamespace(
+            ok=False, status_code=403, text='',
+            json=lambda: {'message': 'Forbidden'},
+            raise_for_status=raise_for_status,
+        )
 
     monkeypatch.setattr(github.session, 'post', mock_post)
 
