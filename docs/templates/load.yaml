@@ -4,3 +4,9 @@ dpetl_load:
   repo: my-data-repo
   level: user   # optional (Defaults to user)
   visibility: private   # optional (Defaults to private)
+  target: github   # optional (Defaults to github). Use postgres to load data into Postgres
+  # schema: my_schema   # optional (Defaults to the package name). Postgres schema used when target: postgres
+
+# Linktable configuration (defined once per package, optional)
+# dpetl_linktable:
+#   resource_list: [execucao, empenho]   # required. Resources used to build the cross-package linktable

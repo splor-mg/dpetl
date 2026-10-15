@@ -27,9 +27,10 @@ All variables above can also be set in a `.env` file in the current directory in
 | `EMAIL_IMAP` | extract (email mode) | IMAP server address (e.g., imap.gmail.com) |
 | `HTTP_PROXY` | extract (email mode) | Proxy settings for IMAP connections* |
 | `ANONYMIZE_SECRET_KEY` | transform | Secret key for AES‑SIV anonymization |
-| `GH_TOKEN` | load | GitHub Personal Access Token |
-| `GH_APP_ID` | load | GitHub App ID |
-| `GH_APP_PRIVATE_KEY` | load | GitHub App private key |
-| `GH_APP_INSTALLATION_ID` | load | GitHub App installation ID (optional) |
+| `GH_TOKEN` | load, linktable | GitHub Personal Access Token |
+| `GH_APP_ID` | load, linktable | GitHub App ID |
+| `GH_APP_PRIVATE_KEY` | load, linktable | GitHub App private key |
+| `GH_APP_INSTALLATION_ID` | load, linktable | GitHub App installation ID (optional) |
+| `PG_URL` | load, linktable (`target: postgres`) | Postgres connection URL, e.g. `postgresql://user:password@host:5432/database` |
 
 **\* Proxy notes:** If your network requires a proxy, dpetl supports both uppercase and lowercase proxy environment variables. Use the format `http://user:pwd@host:port` when authentication is required.
