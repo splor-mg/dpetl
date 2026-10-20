@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 from frictionless import Dialect, Resource
 
-from dpetl.transform import anonymize
+from dpetl.transform import anonymize, join
 
 
 def get_output_settings(resource):
@@ -89,15 +89,18 @@ def update_metadata(resource, path, format, compression, extension, delimiter, c
         resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
 
     # Update field properties
-    schema = resource.schema.fields
-    for index, field in enumerate(schema):
-        schema[index] = field.to_copy(
+    schema = []
+    for field in resource.schema.fields:
+        schema.append(field.to_copy(
             constraints=anonymize.build_constraints(field),
-        )
+        ))
+        schema.extend(join.build_fields(field))
+    resource.schema.fields = schema
 
     # Remove custom property from all fields
     for field in schema:
         field.custom.pop('target', None)
+        field.custom.pop('join', None)
         field.custom.pop('anonymize', None)
 
     # Clear extrapaths and infer schema from the output file
