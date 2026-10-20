@@ -67,7 +67,9 @@ def load_package(package, **kwargs):
 
     deletions = github.get_deletions(token, files, **settings)
 
-    if settings['repo']:
+    if settings['repo'] and settings['mode'] == 'git':
+        github.commit_clone(token, files, deletions, **settings)
+    elif settings['repo']:
         github.commit_remote(token, files, deletions, **settings)
     else:
         github.commit_local(files, deletions)
