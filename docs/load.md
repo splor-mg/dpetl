@@ -31,6 +31,12 @@ Reads its settings from the package's `dpetl_load` property:
 
 - `visibility`: optional (defaults to `private`). Use `public` for a public repository.
 
+- `mode`: optional (defaults to `api`). How the files are sent when `repo` is set:
+
+    - `api`: uses the GitHub API, without cloning the repository.
+
+    - `git`: sends the files through a temporary clone and `dpetl-upload` branch (for files too large for the API, up to 100 MB).
+    
 If `repo` is set and the repository doesn't exist, dpetl creates it automatically.
 
 Before publishing, the `dpetl_extract`, `dpetl_transform` and `dpetl_load` properties are removed from the descriptor.
