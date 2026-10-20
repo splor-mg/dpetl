@@ -233,6 +233,24 @@ def test_update_metadata_builds_anonymize_constraints(dpetl_package, monkeypatch
     assert resource.schema.fields[0].constraints['pattern'] == '^[0-9a-f]{16}$'
 
 
+def test_update_metadata_adds_join_fields(monkeypatch):
+    """The columns of a join become fields right after the joined field, and `join` is removed."""
+    resource = Resource.from_descriptor({
+        'name': 'test',
+        'path': 'data/test.csv',
+        'schema': {'fields': [
+            {'name': 'uo_cod', 'type': 'integer', 'join': {'path': 'uo.csv', 'columns': ['uo_sigla', 'uo_nome']}},
+            {'name': 'valor', 'type': 'number'},
+        ]},
+    })
+    monkeypatch.setattr(resource, 'infer', lambda *a, **k: None)
+
+    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', ',', cli=None)
+
+    assert [field.name for field in resource.schema.fields] == ['uo_cod', 'uo_sigla', 'uo_nome', 'valor']
+    assert 'join' not in resource.schema.fields[0].custom
+
+
 # Tests for update_metadata (cli) ----------------------------------------------
 def test_update_metadata_with_cli(tmp_path):
     """When 'cli' is set, the resource is (re-)inferred from the file it points to."""
