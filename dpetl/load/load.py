@@ -51,8 +51,11 @@ def load_package(package, **kwargs):
 
     # Prepare files to send
     files = {}
-    for resource in package.resources:
-        [resource.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform']]
+    for resource in list(package.resources):
+        if resource.custom.get('dpetl_load') is False:
+            package.remove_resource(resource.name)
+            continue
+        [resource.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform', 'dpetl_load']]
         file = Path(package._basepath) / resource.path
         with open(file, 'rb') as f:
             files[resource.path] = f.read()
@@ -67,7 +70,9 @@ def load_package(package, **kwargs):
 
     deletions = github.get_deletions(token, files, **settings)
 
-    if settings['repo']:
+    if settings['repo'] and settings['mode'] == 'git':
+        github.commit_clone(token, files, deletions, **settings)
+    elif settings['repo']:
         github.commit_remote(token, files, deletions, **settings)
     else:
         github.commit_local(files, deletions)

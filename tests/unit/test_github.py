@@ -75,16 +75,17 @@ def test_get_repo_settings_valid():
 
     settings = github.get_repo_settings(package)
 
-    assert settings == {'owner': 'test', 'repo': 'repo', 'level': 'orgs', 'visibility': 'public'}
+    assert settings == {'owner': 'test', 'repo': 'repo', 'level': 'orgs', 'visibility': 'public', 'mode': 'api'}
 
 
 @pytest.mark.parametrize('dpetl_load', [
     {'repo': 'repo'},   # missing owner
     {'owner': 'test', 'repo': 'repo', 'level': 'invalid'},
     {'owner': 'test', 'repo': 'repo', 'visibility': 'invalid'},
+    {'owner': 'test', 'repo': 'repo', 'mode': 'invalid'},
 ])
 def test_get_repo_settings_invalid(dpetl_load):
-    """Missing owner, or an invalid level/visibility, exits instead of proceeding."""
+    """Missing owner, or an invalid level/visibility/mode, exits instead of proceeding."""
     with pytest.raises(SystemExit):
         github.get_repo_settings(make_package(dpetl_load))
 

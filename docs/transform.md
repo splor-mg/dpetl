@@ -10,11 +10,15 @@ dpetl transform
 dpetl transform keygen
 ```
 
+> **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
+
 ## Resource properties
 
 Each resource can be exported using dpetl's built-in pipeline, an external command, or both. When both are used, the command runs after the pipeline, so it can further modify the file dpetl has already written.
 
 After transformation, each resource becomes a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
+
+> **Tip:** Set `dpetl_transform: false` on a package or resource to skip it.
 
 ### Output settings (for the built‑in pipeline)
 
@@ -22,9 +26,9 @@ These are read from the resource's `dpetl_transform` property:
 
 - `path`: optional (defaults to `data`). Folder where the transformed file is saved.
 
-- `format`: optional (defaults to `csv.gz`, a gzip-compressed CSV).
+- `format`: optional (defaults to `csv.gz`, a gzip-compressed .csv).
 
-    Supported formats: `csv`, `txt`, `xlsx` — optionally followed by a compression, like `csv.gz`.
+    - Supported formats: `csv`, `txt`, `xlsx` — optionally followed by a compression, like `csv.gz`.
 
 - `encoding`: optional (defaults to `utf-8`). Used for `csv`/`txt` files.
 
@@ -40,11 +44,11 @@ Runs shell commands as a complement to or replacement for the built‑in pipelin
 
 - `pre_process`: optional (defaults to `true`). If `true`, the built‑in pipeline runs first and the command should (over)write that same file. If false, the built‑in pipeline is skipped and the command alone produces the output file.
 
-- `stdin`: optional (defaults to `false`). Pipes the built-in pipeline's output to each command's stdin as CSV instead of writing it to disk.
+- `stdin`: optional (defaults to `false`). Pipes the built-in pipeline's output to each command's stdin as .csv instead of writing it to disk.
 
 - `custom`: optional. Defined at the package level, not inside `cli`. Each key is passed to the commands as an environment variable, with its value written as JSON.
 
-The cli's output must be a file named after the resource (case‑insensitive match). Its `format`, `encoding` and `schema` are inferred directly from that file – not from the settings above.
+The cli's output must be a file named after the resource (case‑insensitive match). Its `format` and new columns are inferred from that file.
 
 ## Field properties
 
@@ -53,6 +57,24 @@ Any field in the resource schema may define additional properties to modify its 
 ### `target`
 
 If a field defines a `target` property, the field is renamed to the specified target value. After transformation, the `target` property is removed.
+
+### `join`
+
+Adds columns from a .csv file. Useful for attaching labels or descriptions to codes.
+
+- `path`: .csv file to read, relative to the directory where `dpetl` runs.
+
+- `columns`: columns to add, in order, as `{name in the resource: column in the file}`.
+
+- `key`: optional (defaults to the field name). Column of the file matched against the field.
+
+- `by`: optional. Other fields to match, as `{field in the resource: column in the file}`. They must come before the field in the schema.
+
+- `descriptor`: optional. `path` and `resource` of a datapackage to copy the fields of the columns from (defaults to `string` fields).
+
+Unmatched rows get empty values. Identical duplicate rows are dropped; for a key with different values, the first row is kept.
+
+> **Tip:** use `dpetl --verbose` to see details about the join.
 
 ### `anonymize`
 
@@ -79,8 +101,6 @@ Supported `method` values:
     - Other characters are literals.
 
 You can also add a `filter` condition (a Python expression) to control which rows are anonymized.
-
-> **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
 
 ## Example
 

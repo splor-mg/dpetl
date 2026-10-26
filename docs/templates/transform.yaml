@@ -38,6 +38,21 @@
           anonymize:
             method: '[###-***-####]'
 
+  # Join columns from another file
+  - name: sales
+    path: data/sales.csv
+    schema:
+      fields:
+        - name: year
+          type: integer
+        - name: product_code
+          type: string
+          join:
+            path: data/products.csv   # required. Relative to where dpetl runs
+            columns: {name: product_name, category: category}   # required. Columns to add, in order
+            key: product_code   # optional (Defaults to the field name)
+            by: {year: year}   # optional. {field in the resource: column in the file}
+
   # External command
   - name: payroll
     path: data/payroll.csv

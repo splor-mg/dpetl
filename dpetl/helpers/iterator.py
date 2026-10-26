@@ -23,7 +23,7 @@ def descriptor_iteration(**kwargs):
         descriptors = [Path(default)]
 
     elif Path('datapackages').is_dir():
-        descriptors = Path('datapackages').glob(f'*/{default}')
+        descriptors = sorted(Path('datapackages').glob(f'*/{default}'))
 
     else:
         logger.error('No descriptor found.')

@@ -1,10 +1,13 @@
 import base64
 import json
 import logging
+import os
 import requests
 import subprocess
+import tempfile
 import time
 from datetime import datetime
+from pathlib import Path
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -30,6 +33,7 @@ def get_repo_settings(package):
     repo = dpetl.get('repo')
     level = dpetl.get('level') or 'user'
     visibility = dpetl.get('visibility') or 'private'
+    mode = dpetl.get('mode') or 'api'
 
     if repo and not owner:
         logger.error('Missing required field "owner" in "dpetl_load".')
@@ -43,11 +47,16 @@ def get_repo_settings(package):
         logger.error('Field "visibility" in "dpetl_load" must be "public" or "private".')
         raise SystemExit(1)
 
+    if mode not in ('api', 'git'):
+        logger.error('Field "mode" in "dpetl_load" must be "api" or "git".')
+        raise SystemExit(1)
+
     return {
         'owner': owner,
         'repo': repo,
         'level': level,
         'visibility': visibility,
+        'mode': mode,
     }
 
 
@@ -211,6 +220,10 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
                 'encoding': 'base64'
             }
         )
+
+        if not r.ok:
+            logger.error('GitHub API error creating blob %s: %s', path, r.text)
+
         r.raise_for_status()
         blob = r.json()
 
@@ -249,6 +262,14 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
         logger.info('No changes to commit.')
         return
 
+    create_commit(url, headers, owner, repo, files, tree['sha'], sha, branch)
+
+
+def create_commit(url, headers, owner, repo, files, tree, parent, branch):
+    """
+    Create a commit with `tree` on top of `parent` and move `branch` to it.
+    Without an author in the request, GitHub uses the authenticated user or App.
+    """
     # Create commit with timestamp
     timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
@@ -257,8 +278,8 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
         headers=headers,
         json={
             'message': f'update data package at: {timestamp}',
-            'tree': tree['sha'],
-            'parents': [sha]
+            'tree': tree,
+            'parents': [parent]
         }
     )
     r.raise_for_status()
@@ -292,6 +313,122 @@ def get_local_descriptor():
         capture_output=True
     )
     return r.stdout if r.returncode == 0 else None
+
+
+def commit_clone(token, files, deletions, owner, repo, **kwargs):
+    """
+    Push the files to a temporary branch through a clone of the GitHub repository,
+    then create the commit with the GitHub API, as the authenticated user or App.
+    Unlike the blobs API, git accepts large files, and files over GitHub's
+    100 MB limit are sent with Git LFS.
+    """
+    url = f'https://api.github.com/repos/{owner}/{repo}'
+
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.github+json'
+    }
+
+    # Authenticate git with the token without exposing it in commands or logs.
+    # Only for github.com: Git LFS uploads go to other hosts, which reject it.
+    credentials = base64.b64encode(f'x-access-token:{token}'.encode()).decode()
+    header = f'AUTHORIZATION: basic {credentials}'
+
+    with tempfile.TemporaryDirectory() as directory:
+        logger.debug('Cloning %s/%s.', owner, repo)
+        subprocess.run(
+            [
+                'git', 'clone', '--depth', '1',
+                f'https://github.com/{owner}/{repo}.git', directory,
+            ],
+            env={
+                **os.environ,
+                'GIT_CONFIG_COUNT': '1',
+                'GIT_CONFIG_KEY_0': 'http.https://github.com/.extraheader',
+                'GIT_CONFIG_VALUE_0': header,
+                'GIT_LFS_SKIP_SMUDGE': '1',
+            },
+            check=True,
+        )
+
+        # Keep the token only in the temporary clone. The author is only used
+        # in the temporary commit, the final one is created with the API.
+        with open(Path(directory) / '.git' / 'config', 'a') as config:
+            config.write(
+                f'[http "https://github.com/"]\n\textraheader = {header}\n'
+                '[user]\n'
+                '\tname = dpetl\n'
+                '\temail = dpetl@users.noreply.github.com\n'
+            )
+
+        for path, content in files.items():
+            file = Path(directory) / path
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_bytes(content)
+
+        # Remove resources that no longer belong to the data package
+        if deletions:
+            logger.debug('Removing outdated resources: %s', ', '.join(deletions))
+            subprocess.run(
+                ['git', 'rm', '-f', '--ignore-unmatch', *deletions],
+                cwd=directory,
+                check=True,
+            )
+
+        # Files over GitHub's 100 MB limit go to Git LFS, tracked in .gitattributes
+        large = [
+            path for path, content in files.items()
+            if len(content) > 100 * 1024 * 1024
+        ]
+        if large:
+            logger.debug('Sending with Git LFS: %s', ', '.join(large))
+            for command in (['install', '--local'], ['track', *large]):
+                subprocess.run(['git', 'lfs', *command], cwd=directory, check=True)
+            subprocess.run(['git', 'add', '.gitattributes'], cwd=directory, check=True)
+
+        subprocess.run(
+            ['git', 'add', '-f', *files.keys()],
+            cwd=directory,
+            check=True,
+        )
+
+        changes = subprocess.run(
+            ['git', 'diff', '--cached', '--quiet'],
+            cwd=directory,
+        )
+        if changes.returncode == 0:
+            logger.info('No changes to commit.')
+            return
+
+        subprocess.run(
+            ['git', 'commit', '-m', 'dpetl-upload'],
+            cwd=directory,
+            check=True,
+        )
+
+        try:
+            # --force overwrites a branch left behind by an interrupted run
+            logger.debug('Pushing files to temporary branch dpetl-upload.')
+            subprocess.run(
+                ['git', 'push', '--force', 'origin', 'HEAD:refs/heads/dpetl-upload'],
+                cwd=directory,
+                check=True,
+            )
+
+            # Commit the pushed tree with the API, on top of the cloned commit
+            tree, parent, branch = subprocess.check_output(
+                ['git', 'rev-parse', 'HEAD^{tree}', 'HEAD~1', '--abbrev-ref', 'HEAD'],
+                cwd=directory,
+                text=True,
+            ).split()
+
+            create_commit(url, headers, owner, repo, files, tree, parent, branch)
+
+        finally:
+            session.delete(
+                f'{url}/git/refs/heads/dpetl-upload',
+                headers=headers,
+            )
 
 
 def commit_local(files, deletions=()):

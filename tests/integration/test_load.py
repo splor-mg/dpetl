@@ -5,6 +5,7 @@ GitHub repository operations, authentication, and commit handling.
 import pytest
 import requests
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 from dpetl.load import github, load
@@ -33,6 +34,7 @@ def mock_github(monkeypatch, repo_exists=True, deletions=None):
     monkeypatch.setattr('dpetl.load.load.github.get_deletions', lambda *a, **k: calls.append('get_deletions') or (deletions or set()))
     monkeypatch.setattr('dpetl.load.load.github.commit_remote', lambda *a, **k: calls.append('commit_remote'))
     monkeypatch.setattr('dpetl.load.load.github.commit_local', lambda *a, **k: calls.append('commit_local'))
+    monkeypatch.setattr('dpetl.load.load.github.commit_clone', lambda *a, **k: calls.append('commit_clone'))
     return calls
 
 
@@ -68,11 +70,41 @@ def test_load_package_local_commit(monkeypatch, tmp_path):
     assert 'commit_local' in calls
 
 
+def test_load_package_git_mode(monkeypatch, tmp_path):
+    """With mode 'git', files are pushed through a clone instead of the GitHub API."""
+    calls = mock_github(monkeypatch)
+    package = FakePackage(custom={'dpetl_load': {'owner': 'test', 'repo': 'repo', 'mode': 'git'}},
+                          basepath=str(tmp_path))
+
+    load.load_package(package)
+
+    assert 'commit_clone' in calls
+    assert 'commit_remote' not in calls
+
+
+def test_load_package_skips_disabled_resource(monkeypatch, dpetl_package, scoped_package):
+    """A resource with `dpetl_load: false` is not sent and leaves the descriptor."""
+    mock_github(monkeypatch)
+    sent = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: sent.update(files),
+    )
+    package = scoped_package(dpetl_package, 'basic', 'renamed')
+    package.get_resource('renamed').custom['dpetl_load'] = False
+
+    load.load_package(package)
+
+    assert [resource.name for resource in package.resources] == ['basic']
+    assert set(sent) == {package.get_resource('basic').path, 'datapackage.json'}
+
+
 @pytest.mark.parametrize(('custom', 'missing_field'), [
     ({}, 'GH_TOKEN'),
     ({'dpetl_load': {'repo': 'repo'}}, 'owner'),
     ({'dpetl_load': {'owner': 'test', 'repo': 'repo', 'level': 'invalid'}}, 'level'),
     ({'dpetl_load': {'owner': 'test', 'repo': 'repo', 'visibility': 'invalid'}}, 'visibility'),
+    ({'dpetl_load': {'owner': 'test', 'repo': 'repo', 'mode': 'invalid'}}, 'mode'),
 ])
 def test_load_package_validation_errors(monkeypatch, custom, missing_field):
     """Missing/invalid dpetl_load configuration exits instead of proceeding."""
@@ -209,7 +241,7 @@ def mock_git_api(monkeypatch, tree_sha='base_tree_sha', check_tree_deletion=Fals
             sha = 'blob_sha'
         else:
             sha = 'new_commit_sha'
-        return SimpleNamespace(status_code=201, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
+        return SimpleNamespace(status_code=201, ok=True, json=lambda: {'sha': sha}, raise_for_status=lambda: None)
 
     def mock_patch(url, headers=None, json=None):
         patch_called.append(True)
@@ -251,19 +283,22 @@ def test_commit_remote_no_changes(monkeypatch):
     assert patch_called == []
 
 
-def test_commit_remote_blob_error(monkeypatch):
-    """A rejected blob upload raises HTTPError instead of failing on the missing sha."""
+def test_commit_remote_blob_error(monkeypatch, caplog):
+    """A rejected blob upload is logged with GitHub's answer and raises HTTPError."""
     mock_git_api(monkeypatch)
 
     def mock_post(url, headers=None, json=None):
         def raise_for_status():
             raise requests.exceptions.HTTPError()
-        return SimpleNamespace(status_code=403, raise_for_status=raise_for_status)
+        return SimpleNamespace(status_code=422, ok=False, text='Validation Failed',
+                               raise_for_status=raise_for_status)
 
     monkeypatch.setattr(github.session, 'post', mock_post)
 
     with pytest.raises(requests.exceptions.HTTPError):
         github.commit_remote('token', {'a.txt': b'x'}, set(), owner='owner', repo='repo')
+
+    assert 'GitHub API error creating blob a.txt: Validation Failed' in caplog.text
 
 
 def test_session_retries_rate_limit_and_server_errors():
@@ -323,3 +358,86 @@ def test_commit_local_with_deletions(monkeypatch):
     assert ['git', 'add', '-f', 'new_file.csv'] in commands
     assert any(cmd[0:3] == ['git', 'commit', '-m'] for cmd in commands)
     assert ['git', 'push'] in commands
+
+
+# Tests for github.commit_clone ------------------------------------------------
+def mock_clone(monkeypatch, commit_error=False, changes=True):
+    """Mocks git and the GitHub API calls commit_clone makes, tracking them."""
+    commands = []
+    api = []
+
+    def mock_run(cmd, **kwargs):
+        commands.append(cmd)
+        if cmd[0:2] == ['git', 'clone']:
+            (Path(cmd[-1]) / '.git').mkdir()
+            api.append(('clone_env', kwargs['env'].get('GIT_LFS_SKIP_SMUDGE'), None))
+        returncode = 1 if changes and cmd == ['git', 'diff', '--cached', '--quiet'] else 0
+        return SimpleNamespace(returncode=returncode)
+
+    def mock_post(url, headers=None, json=None):
+        api.append(('post', url, json))
+        if commit_error:
+            raise requests.exceptions.HTTPError()
+        return SimpleNamespace(json=lambda: {'sha': 'new_commit_sha'}, raise_for_status=lambda: None)
+
+    monkeypatch.setattr(subprocess, 'run', mock_run)
+    monkeypatch.setattr(subprocess, 'check_output', lambda cmd, **k: 'tree_sha\nhead_sha\nmain\n')
+    monkeypatch.setattr(github.session, 'post', mock_post)
+    monkeypatch.setattr(github.session, 'patch', lambda url, headers=None, json=None:
+                        api.append(('patch', url, json)) or SimpleNamespace(raise_for_status=lambda: None))
+    monkeypatch.setattr(github.session, 'delete', lambda url, headers=None: api.append(('delete', url, None)))
+    return commands, api
+
+
+def test_commit_clone(monkeypatch):
+    """Files are pushed to a temporary branch, committed with the API, and the branch is deleted."""
+    commands, api = mock_clone(monkeypatch)
+
+    github.commit_clone('secret', {'data/a.csv': b'x'}, {'old.csv'}, owner='owner', repo='repo')
+
+    url = 'https://api.github.com/repos/owner/repo'
+    assert commands[0][0:5] == ['git', 'clone', '--depth', '1', 'https://github.com/owner/repo.git']
+    assert ['git', 'rm', '-f', '--ignore-unmatch', 'old.csv'] in commands
+    assert ['git', 'push', '--force', 'origin', 'HEAD:refs/heads/dpetl-upload'] in commands
+    assert not any('secret' in ' '.join(cmd) for cmd in commands)
+    assert not any(cmd[0:2] == ['git', 'lfs'] for cmd in commands)
+    assert api[0] == ('clone_env', '1', None)
+    assert api[1][1] == f'{url}/git/commits'
+    assert api[1][2]['tree'] == 'tree_sha' and api[1][2]['parents'] == ['head_sha']
+    assert api[2] == ('patch', f'{url}/git/refs/heads/main', {'sha': 'new_commit_sha'})
+    assert api[3] == ('delete', f'{url}/git/refs/heads/dpetl-upload', None)
+
+
+def test_commit_clone_no_changes(monkeypatch, caplog):
+    """Without changes in the clone, nothing is committed or pushed."""
+    caplog.set_level('INFO')
+    commands, api = mock_clone(monkeypatch, changes=False)
+
+    github.commit_clone('secret', {'data/a.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    assert 'No changes to commit.' in caplog.text
+    assert not any(cmd[0:2] == ['git', 'commit'] for cmd in commands)
+    assert api == [('clone_env', '1', None)]
+
+
+def test_commit_clone_sends_large_files_with_lfs(monkeypatch):
+    """Files over 100 MB are tracked with Git LFS before being added."""
+    commands, api = mock_clone(monkeypatch)
+    large = b'x' * (100 * 1024 * 1024 + 1)
+
+    github.commit_clone('secret', {'data/big.csv.gz': large, 'small.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    track = commands.index(['git', 'lfs', 'track', 'data/big.csv.gz'])
+    assert ['git', 'lfs', 'install', '--local'] in commands
+    assert commands.index(['git', 'add', '.gitattributes']) > track
+    assert commands.index(['git', 'add', '-f', 'data/big.csv.gz', 'small.csv']) > track
+
+
+def test_commit_clone_deletes_branch_on_error(monkeypatch):
+    """The temporary branch is deleted even when the commit fails."""
+    commands, api = mock_clone(monkeypatch, commit_error=True)
+
+    with pytest.raises(requests.exceptions.HTTPError):
+        github.commit_clone('secret', {'data/a.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    assert api[-1] == ('delete', 'https://api.github.com/repos/owner/repo/git/refs/heads/dpetl-upload', None)

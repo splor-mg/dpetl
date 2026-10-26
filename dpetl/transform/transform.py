@@ -3,7 +3,7 @@ import logging
 import petl as etl
 from dotenv import load_dotenv, find_dotenv
 
-from dpetl.transform import anonymize, command, datapackage
+from dpetl.transform import anonymize, command, datapackage, join
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
@@ -24,6 +24,9 @@ def transform_package(package, **kwargs):
     errors = []
 
     for resource in package.resources:
+        if resource.custom.get('dpetl_transform') is False:
+            logger.info('Skipping transform for resource %s.', resource.name)
+            continue
 
         logger.debug(
             'Transforming resource %s.',
@@ -34,6 +37,7 @@ def transform_package(package, **kwargs):
         settings = datapackage.get_output_settings(resource)
 
         # Apply transformation functions to a field
+        report = {}
         table = resource.to_petl() if settings['pre_process'] else None
         if table is not None:
             for field in resource.schema.fields:
@@ -42,6 +46,9 @@ def transform_package(package, **kwargs):
                 if target:
                     table = etl.rename(table, field.name, target)
                     field.name = target
+
+                # Add columns from other files
+                table = join.apply_join(resource.schema, field, table, report)
 
                 # Anonymize field
                 table = anonymize.apply_anonymization(field, table, secret_key)
@@ -53,6 +60,9 @@ def transform_package(package, **kwargs):
         # Run an external transformation script
         if settings['cli']:
             command.check_cli_commands(resource, table, **settings, **kwargs)
+
+        # Log join problems, filled while the data was written
+        join.log_report(report)
 
         # Update resource metadata after transformation
         datapackage.update_metadata(resource, **settings)

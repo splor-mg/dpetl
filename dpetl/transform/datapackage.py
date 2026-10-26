@@ -48,10 +48,17 @@ def write_files(package, resource, table, path, format, extension, encoding, del
         raise ValueError(f'Unsupported format: {format}')
 
 
-def update_metadata(resource, path, format, compression, extension, delimiter, cli, **kwargs):
+def update_metadata(resource, path, format, compression, extension, encoding, delimiter, cli, **kwargs):
     """
     Update resource metadata after transformation to match the generated output file.
     """
+    # Update field properties
+    schema = []
+    for field in resource.schema.fields:
+        schema.append(field.to_copy(
+            constraints=anonymize.build_constraints(field),
+        ))
+
     if cli:
         basepath = resource.package._basepath
         directory = Path(basepath) / (cli.get('path') or path)
@@ -63,7 +70,12 @@ def update_metadata(resource, path, format, compression, extension, delimiter, c
         relative_path = str(output.relative_to(basepath))
 
         def infer(**options):
-            inferred = Resource(path=relative_path, basepath=basepath, **options)
+            inferred = Resource(
+                path=relative_path,
+                basepath=basepath,
+                encoding=encoding,
+                **options,
+            )
             inferred.infer(stats=True)
             return inferred
 
@@ -77,8 +89,12 @@ def update_metadata(resource, path, format, compression, extension, delimiter, c
         resource.compression = inferred.compression
         resource.encoding = inferred.encoding
         resource.dialect = inferred.dialect
-        resource.schema = inferred.schema
         resource.stats = inferred.stats
+
+        # Follow the columns of the output file, keeping the known fields
+        # and inferring only the columns created by the command
+        known = {field.name: field for field in schema}
+        schema = [known.get(field.name, field) for field in inferred.schema.fields]
 
     else:
         # Update file-related resource properties
@@ -88,16 +104,12 @@ def update_metadata(resource, path, format, compression, extension, delimiter, c
         resource.compression = compression
         resource.dialect = Dialect.from_descriptor({'csv': {'delimiter': delimiter}})
 
-    # Update field properties
-    schema = resource.schema.fields
-    for index, field in enumerate(schema):
-        schema[index] = field.to_copy(
-            constraints=anonymize.build_constraints(field),
-        )
+    resource.schema.fields = schema
 
     # Remove custom property from all fields
     for field in schema:
         field.custom.pop('target', None)
+        field.custom.pop('join', None)
         field.custom.pop('anonymize', None)
 
     # Clear extrapaths and infer schema from the output file
