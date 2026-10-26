@@ -18,6 +18,8 @@ dpetl extract --delay 5   # or -d 5
 
 Each resource in the descriptor must declare an extraction `mode` (`email`, `api` or `cli`) inside its `dpetl_extract` property (see [Example](#example)). If a resource is missing this property, the whole package extraction stops immediately.
 
+> **Tip:** Set `dpetl_extract: false` on a package or resource to skip it.
+
 ## API Extractor
 
 Reads the request settings from the resource's `sources` property:

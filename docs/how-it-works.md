@@ -24,6 +24,8 @@ dpetl extract -d datapackages/sales/datapackage.yaml -d datapackages/hr/datapack
 
 You can **skip a command entirely for a given package** by setting `enabled: false` under the corresponding `dpetl_extract`, `dpetl_transform` or `dpetl_load` key at the package level in the descriptor.
 
+**For a single resource**, set the key to `false` in the resource.
+
 ```yaml
 # full form
 dpetl_extract:

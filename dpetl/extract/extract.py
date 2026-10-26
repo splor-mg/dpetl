@@ -16,6 +16,10 @@ def extract_package(package, **kwargs):
     delay = kwargs.get('delay', 0)
 
     for resource in package.resources:
+        if resource.custom.get('dpetl_extract') is False:
+            logger.info('Skipping extract for resource %s.', resource.name)
+            continue
+
         # Get extraction mode from resource custom metadata
         mode = resource.custom.get('dpetl_extract', {}).get('mode')
 

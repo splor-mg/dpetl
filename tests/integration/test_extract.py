@@ -99,6 +99,22 @@ def test_extract_package_modes(monkeypatch, mode, mock_path, expected):
     assert calls == [expected]
 
 
+def test_extract_package_skips_disabled_resource(monkeypatch):
+    """
+    A resource with dpetl_extract: false is skipped without stopping the others.
+    """
+    calls = []
+    monkeypatch.setattr('dpetl.extract.email.email_connection', lambda resource, **k: calls.append(resource.name))
+
+    skipped = make_fake_resource(None, name='skipped')
+    skipped.custom['dpetl_extract'] = False
+    package = make_fake_package([skipped, make_fake_resource('email', name='kept')])
+
+    extract.extract_package(package, no_stop=True, no_validate=True)
+
+    assert calls == ['kept']
+
+
 @pytest.mark.parametrize('check_resource_result, expected_sleep_calls', [
     (True, [2]),
     (False, []),
