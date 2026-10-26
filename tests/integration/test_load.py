@@ -82,6 +82,23 @@ def test_load_package_git_mode(monkeypatch, tmp_path):
     assert 'commit_remote' not in calls
 
 
+def test_load_package_skips_disabled_resource(monkeypatch, dpetl_package, scoped_package):
+    """A resource with `dpetl_load: false` is not sent and leaves the descriptor."""
+    mock_github(monkeypatch)
+    sent = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: sent.update(files),
+    )
+    package = scoped_package(dpetl_package, 'basic', 'renamed')
+    package.get_resource('renamed').custom['dpetl_load'] = False
+
+    load.load_package(package)
+
+    assert [resource.name for resource in package.resources] == ['basic']
+    assert set(sent) == {package.get_resource('basic').path, 'datapackage.json'}
+
+
 @pytest.mark.parametrize(('custom', 'missing_field'), [
     ({}, 'GH_TOKEN'),
     ({'dpetl_load': {'repo': 'repo'}}, 'owner'),
@@ -344,7 +361,7 @@ def test_commit_local_with_deletions(monkeypatch):
 
 
 # Tests for github.commit_clone ------------------------------------------------
-def mock_clone(monkeypatch, commit_error=False):
+def mock_clone(monkeypatch, commit_error=False, changes=True):
     """Mocks git and the GitHub API calls commit_clone makes, tracking them."""
     commands = []
     api = []
@@ -353,7 +370,8 @@ def mock_clone(monkeypatch, commit_error=False):
         commands.append(cmd)
         if cmd[0:2] == ['git', 'clone']:
             (Path(cmd[-1]) / '.git').mkdir()
-        returncode = 1 if cmd == ['git', 'diff', '--cached', '--quiet'] else 0
+            api.append(('clone_env', kwargs['env'].get('GIT_LFS_SKIP_SMUDGE'), None))
+        returncode = 1 if changes and cmd == ['git', 'diff', '--cached', '--quiet'] else 0
         return SimpleNamespace(returncode=returncode)
 
     def mock_post(url, headers=None, json=None):
@@ -382,10 +400,37 @@ def test_commit_clone(monkeypatch):
     assert ['git', 'rm', '-f', '--ignore-unmatch', 'old.csv'] in commands
     assert ['git', 'push', '--force', 'origin', 'HEAD:refs/heads/dpetl-upload'] in commands
     assert not any('secret' in ' '.join(cmd) for cmd in commands)
-    assert api[0][1] == f'{url}/git/commits'
-    assert api[0][2]['tree'] == 'tree_sha' and api[0][2]['parents'] == ['head_sha']
-    assert api[1] == ('patch', f'{url}/git/refs/heads/main', {'sha': 'new_commit_sha'})
-    assert api[2] == ('delete', f'{url}/git/refs/heads/dpetl-upload', None)
+    assert not any(cmd[0:2] == ['git', 'lfs'] for cmd in commands)
+    assert api[0] == ('clone_env', '1', None)
+    assert api[1][1] == f'{url}/git/commits'
+    assert api[1][2]['tree'] == 'tree_sha' and api[1][2]['parents'] == ['head_sha']
+    assert api[2] == ('patch', f'{url}/git/refs/heads/main', {'sha': 'new_commit_sha'})
+    assert api[3] == ('delete', f'{url}/git/refs/heads/dpetl-upload', None)
+
+
+def test_commit_clone_no_changes(monkeypatch, caplog):
+    """Without changes in the clone, nothing is committed or pushed."""
+    caplog.set_level('INFO')
+    commands, api = mock_clone(monkeypatch, changes=False)
+
+    github.commit_clone('secret', {'data/a.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    assert 'No changes to commit.' in caplog.text
+    assert not any(cmd[0:2] == ['git', 'commit'] for cmd in commands)
+    assert api == [('clone_env', '1', None)]
+
+
+def test_commit_clone_sends_large_files_with_lfs(monkeypatch):
+    """Files over 100 MB are tracked with Git LFS before being added."""
+    commands, api = mock_clone(monkeypatch)
+    large = b'x' * (100 * 1024 * 1024 + 1)
+
+    github.commit_clone('secret', {'data/big.csv.gz': large, 'small.csv': b'x'}, set(), owner='owner', repo='repo')
+
+    track = commands.index(['git', 'lfs', 'track', 'data/big.csv.gz'])
+    assert ['git', 'lfs', 'install', '--local'] in commands
+    assert commands.index(['git', 'add', '.gitattributes']) > track
+    assert commands.index(['git', 'add', '-f', 'data/big.csv.gz', 'small.csv']) > track
 
 
 def test_commit_clone_deletes_branch_on_error(monkeypatch):
