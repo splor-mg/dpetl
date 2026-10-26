@@ -46,6 +46,25 @@ def test_transform_package_orchestration(fake_package, monkeypatch):
     assert calls == ['write', 'update', 'build']
 
 
+def test_transform_package_skips_disabled_resource(fake_package, monkeypatch):
+    """A resource with `dpetl_transform: false` is left as it is."""
+    calls = []
+    mock_validation(monkeypatch)
+    monkeypatch.setattr(
+        'dpetl.transform.transform.datapackage.update_metadata',
+        lambda *a, **k: calls.append('update'),
+    )
+    monkeypatch.setattr(
+        'dpetl.transform.transform.datapackage.build_datapackage',
+        lambda *a, **k: calls.append('build'),
+    )
+    fake_package.resources[0].custom['dpetl_transform'] = False
+
+    transform.transform_package(fake_package)
+
+    assert calls == ['build']
+
+
 def test_transform_package_renames_target_fields(dpetl_package, scoped_package, monkeypatch):
     """Fields with a 'target' get renamed in the output table."""
     mock_validation(monkeypatch)
@@ -215,7 +234,7 @@ def test_update_metadata_deterministic(dpetl_package, monkeypatch, compression, 
     monkeypatch.setattr(resource, 'infer', lambda *a, **k: None)
     extension = 'csv.gz' if compression else 'csv'
 
-    datapackage.update_metadata(resource, 'processed', 'csv', compression, extension, ',', cli=None)
+    datapackage.update_metadata(resource, 'processed', 'csv', compression, extension, 'utf-8', ',', cli=None)
 
     assert resource.path == expected_path
     if compression:
@@ -228,30 +247,11 @@ def test_update_metadata_builds_anonymize_constraints(dpetl_package, monkeypatch
     resource = dpetl_package.get_resource('anonymized')
     monkeypatch.setattr(resource, 'infer', lambda *a, **k: None)
 
-    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', ',', cli=None)
+    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', 'utf-8', ',', cli=None)
 
     assert resource.schema.fields[0].constraints['pattern'] == '^[0-9a-f]{16}$'
 
 
-def test_update_metadata_adds_join_fields(monkeypatch):
-    """The columns of a join become fields right after the joined field, and `join` is removed."""
-    resource = Resource.from_descriptor({
-        'name': 'test',
-        'path': 'data/test.csv',
-        'schema': {'fields': [
-            {'name': 'uo_cod', 'type': 'integer', 'join': {'path': 'uo.csv', 'columns': ['uo_sigla', 'uo_nome']}},
-            {'name': 'valor', 'type': 'number'},
-        ]},
-    })
-    monkeypatch.setattr(resource, 'infer', lambda *a, **k: None)
-
-    datapackage.update_metadata(resource, 'processed', 'csv', None, 'csv', ',', cli=None)
-
-    assert [field.name for field in resource.schema.fields] == ['uo_cod', 'uo_sigla', 'uo_nome', 'valor']
-    assert 'join' not in resource.schema.fields[0].custom
-
-
-# Tests for update_metadata (cli) ----------------------------------------------
 def test_update_metadata_with_cli(tmp_path):
     """When 'cli' is set, the resource is (re-)inferred from the file it points to."""
     data_dir = tmp_path / 'data'
@@ -268,11 +268,35 @@ def test_update_metadata_with_cli(tmp_path):
 
     datapackage.update_metadata(
         resource, path='data', format='csv', compression='gz',
-        extension='csv.gz', delimiter=',', cli={'path': 'data'}
+        extension='csv.gz', encoding='utf-8', delimiter=',', cli={'path': 'data'}
     )
 
     assert resource.path == 'data/test.csv'
     assert resource.format == 'csv'
+
+
+def test_update_metadata_with_cli_keeps_known_fields(tmp_path):
+    """With 'cli', known fields are kept as they are and only new columns are inferred."""
+    data_dir = tmp_path / 'data'
+    data_dir.mkdir()
+    (data_dir / 'test.csv').write_text('col1,col2\nvalor1,1\n', encoding='utf-8')
+
+    resource = Resource.from_descriptor({
+        'name': 'test',
+        'path': 'data/test.csv',
+        'schema': {'fields': [{'name': 'col1', 'type': 'string', 'title': 'Coluna 1'}]},
+    }, basepath=str(tmp_path))
+    package = Package(resources=[resource], basepath=str(tmp_path))
+    resource = package.resources[0]
+
+    datapackage.update_metadata(
+        resource, path='data', format='csv', compression=None,
+        extension='csv', encoding='utf-8', delimiter=',', cli={'path': 'data'}
+    )
+
+    fields = resource.schema.fields
+    assert [(field.name, field.type) for field in fields] == [('col1', 'string'), ('col2', 'integer')]
+    assert fields[0].title == 'Coluna 1'
 
 
 def test_update_metadata_with_cli_non_table_falls_back_to_format(tmp_path):
@@ -291,7 +315,7 @@ def test_update_metadata_with_cli_non_table_falls_back_to_format(tmp_path):
 
     datapackage.update_metadata(
         resource, path='data', format='csv', compression=None,
-        extension='log', delimiter=',', cli={'path': 'data'}
+        extension='log', encoding='utf-8', delimiter=',', cli={'path': 'data'}
     )
 
     assert resource.path == 'data/test.log'

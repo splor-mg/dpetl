@@ -18,6 +18,8 @@ Each resource can be exported using dpetl's built-in pipeline, an external comma
 
 After transformation, each resource becomes a single file, with updated `path`, `extrapaths` (removed), `scheme`, `format` and `compression` (if any) values, and inferred `stats`.
 
+> **Tip:** Set `dpetl_transform: false` on a package or resource to skip it.
+
 ### Output settings (for the built‑in pipeline)
 
 These are read from the resource's `dpetl_transform` property:
@@ -46,7 +48,7 @@ Runs shell commands as a complement to or replacement for the built‑in pipelin
 
 - `custom`: optional. Defined at the package level, not inside `cli`. Each key is passed to the commands as an environment variable, with its value written as JSON.
 
-The cli's output must be a file named after the resource (case‑insensitive match). Its `format`, `encoding` and `schema` are inferred directly from that file – not from the settings above.
+The cli's output must be a file named after the resource (case‑insensitive match). Its `format` and new columns are inferred from that file.
 
 ## Field properties
 
@@ -62,11 +64,13 @@ Adds columns from a .csv file. Useful for attaching labels or descriptions to co
 
 - `path`: .csv file to read, relative to the directory where `dpetl` runs.
 
-- `columns`: columns of the file to add, in order.
+- `columns`: columns to add, in order, as `{name in the resource: column in the file}`.
 
 - `key`: optional (defaults to the field name). Column of the file matched against the field.
 
 - `by`: optional. Other fields to match, as `{field in the resource: column in the file}`. They must come before the field in the schema.
+
+- `descriptor`: optional. `path` and `resource` of a datapackage to copy the fields of the columns from (defaults to `string` fields).
 
 Unmatched rows get empty values. Identical duplicate rows are dropped; for a key with different values, the first row is kept.
 

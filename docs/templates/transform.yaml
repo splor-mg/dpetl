@@ -49,7 +49,7 @@
           type: string
           join:
             path: data/products.csv   # required. Relative to where dpetl runs
-            columns: [product_name, category]   # required. Columns to add, in order
+            columns: {name: product_name, category: category}   # required. Columns to add, in order
             key: product_code   # optional (Defaults to the field name)
             by: {year: year}   # optional. {field in the resource: column in the file}
 

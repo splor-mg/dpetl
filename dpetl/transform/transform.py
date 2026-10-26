@@ -24,6 +24,9 @@ def transform_package(package, **kwargs):
     errors = []
 
     for resource in package.resources:
+        if resource.custom.get('dpetl_transform') is False:
+            logger.info('Skipping transform for resource %s.', resource.name)
+            continue
 
         logger.debug(
             'Transforming resource %s.',
@@ -45,7 +48,7 @@ def transform_package(package, **kwargs):
                     field.name = target
 
                 # Add columns from other files
-                table = join.apply_join(field, table, report)
+                table = join.apply_join(resource.schema, field, table, report)
 
                 # Anonymize field
                 table = anonymize.apply_anonymization(field, table, secret_key)
