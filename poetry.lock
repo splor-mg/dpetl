@@ -1662,14 +1662,14 @@ re2 = ["google-re2 (>=1.1)"]
 
 [[package]]
 name = "petl"
-version = "1.7.28"
+version = "1.7.30"
 description = "A Python package for extracting, transforming and loading tables of data."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7"
 groups = ["main"]
 files = [
-    {file = "petl-1.7.28-py3-none-any.whl", hash = "sha256:54a995fc9208cad186f800f0105b2c4a129a76a9fae46c8baae0d9f1fbbef815"},
-    {file = "petl-1.7.28.tar.gz", hash = "sha256:239185e29b2ce397a2755dd2fe352cf7bd3e1e6bc601e7e2786c95c4f0fe94b1"},
+    {file = "petl-1.7.30-py3-none-any.whl", hash = "sha256:99b7e9a66b68908146f0f590a4bb61a270572bbe33f33dbf5036a234e4fee2de"},
+    {file = "petl-1.7.30.tar.gz", hash = "sha256:9621fe7f9d81dafec3bf440496118ec1b288215400810a90f683a02c6d120792"},
 ]
 
 [package.extras]
@@ -3100,4 +3100,4 @@ github-app = ["PyJWT", "cryptography"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<4.0"
-content-hash = "aeb1c98ce169b51d78c93d5608cff1941fdb00088c90bb5563825986fa57ece7"
+content-hash = "3ca6ba7b85e7c9fe5d4ef1729d43f2ccefd5e2867c885508803b863d0a4f20e0"

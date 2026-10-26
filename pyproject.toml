@@ -1,6 +1,6 @@
 [project]
 name = 'dpetl'
-version = "0.18.4"
+version = '0.18.4'
 description = ''
 authors = [
     {name = 'Gabriel Dornas',email = 'gabrielbdornas@gmail.com'}
@@ -14,7 +14,8 @@ dependencies = [
     'frictionless[pandas] (>=5.18.1,<6.0.0)',
     'pysocks (>=1.7.1,<2.0.0)',
     'tqdm (>=4.67.3,<5.0.0)',
-    'chardet (>=5.2.0,<6.0.0)'
+    'chardet (>=5.2.0,<6.0.0)',
+    'petl (>=1.7.22)'
 ]
 
 [project.optional-dependencies]
@@ -50,9 +51,9 @@ dev = [
     'commitizen (>=4.17.0,<5.0.0)'
 ]
 docs = [
-    "zensical (>=0.0.67,<0.0.68)",
-    "mkdocstrings-python (>=2.0.9,<3.0.0)",
-    "jinja2 (>=3.1.6,<4.0.0)"
+    'zensical (>=0.0.67,<0.0.68)',
+    'mkdocstrings-python (>=2.0.9,<3.0.0)',
+    'jinja2 (>=3.1.6,<4.0.0)'
 ]
 
 [tool.commitizen]
