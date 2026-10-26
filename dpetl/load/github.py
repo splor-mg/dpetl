@@ -319,7 +319,8 @@ def commit_clone(token, files, deletions, owner, repo, **kwargs):
     """
     Push the files to a temporary branch through a clone of the GitHub repository,
     then create the commit with the GitHub API, as the authenticated user or App.
-    Unlike the blobs API, git accepts large files (up to 100 MB).
+    Unlike the blobs API, git accepts large files, and files over GitHub's
+    100 MB limit are sent with Git LFS.
     """
     url = f'https://api.github.com/repos/{owner}/{repo}'
 
@@ -328,7 +329,8 @@ def commit_clone(token, files, deletions, owner, repo, **kwargs):
         'Accept': 'application/vnd.github+json'
     }
 
-    # Authenticate git with the token without exposing it in commands or logs
+    # Authenticate git with the token without exposing it in commands or logs.
+    # Only for github.com: Git LFS uploads go to other hosts, which reject it.
     credentials = base64.b64encode(f'x-access-token:{token}'.encode()).decode()
     header = f'AUTHORIZATION: basic {credentials}'
 
@@ -342,8 +344,9 @@ def commit_clone(token, files, deletions, owner, repo, **kwargs):
             env={
                 **os.environ,
                 'GIT_CONFIG_COUNT': '1',
-                'GIT_CONFIG_KEY_0': 'http.extraheader',
+                'GIT_CONFIG_KEY_0': 'http.https://github.com/.extraheader',
                 'GIT_CONFIG_VALUE_0': header,
+                'GIT_LFS_SKIP_SMUDGE': '1',
             },
             check=True,
         )
@@ -352,7 +355,7 @@ def commit_clone(token, files, deletions, owner, repo, **kwargs):
         # in the temporary commit, the final one is created with the API.
         with open(Path(directory) / '.git' / 'config', 'a') as config:
             config.write(
-                f'[http]\n\textraheader = {header}\n'
+                f'[http "https://github.com/"]\n\textraheader = {header}\n'
                 '[user]\n'
                 '\tname = dpetl\n'
                 '\temail = dpetl@users.noreply.github.com\n'
@@ -371,6 +374,17 @@ def commit_clone(token, files, deletions, owner, repo, **kwargs):
                 cwd=directory,
                 check=True,
             )
+
+        # Files over GitHub's 100 MB limit go to Git LFS, tracked in .gitattributes
+        large = [
+            path for path, content in files.items()
+            if len(content) > 100 * 1024 * 1024
+        ]
+        if large:
+            logger.debug('Sending with Git LFS: %s', ', '.join(large))
+            for command in (['install', '--local'], ['track', *large]):
+                subprocess.run(['git', 'lfs', *command], cwd=directory, check=True)
+            subprocess.run(['git', 'add', '.gitattributes'], cwd=directory, check=True)
 
         subprocess.run(
             ['git', 'add', '-f', *files.keys()],
