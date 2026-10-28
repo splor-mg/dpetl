@@ -39,7 +39,7 @@ dpetl_linktable:
 
 - The fact tables, the linktable and a `datapackage.json` are published in a single commit, following the same steps as [`load`](load.md).
 
-The destination reuses the `owner`, `level`, `visibility` and `target` from the packages' `dpetl_load` property, so these values must be the same in every package.
+The destination reuses the `owner`, `level`, `visibility`, `target` and `lfs` from the packages' `dpetl_load` property, so these values must be the same in every package. With an LFS `url`, use the `{repo}` placeholder so it also points to the `linktable` repository.
 
 ## Errors
 
@@ -51,4 +51,4 @@ The command stops with an error, before anything is published, when:
 
 - stacked resources (same package and resource names) have different dimensions or facts;
 
-- the packages' `dpetl_load` settings point to different `owner`, `level`, `visibility` or `target`.
+- the packages' `dpetl_load` settings point to different `owner`, `level`, `visibility`, `target` or `lfs`.

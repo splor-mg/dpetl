@@ -3,12 +3,13 @@ Integration tests for the load module:
 GitHub repository operations, authentication, and commit handling.
 """
 import json
+from pathlib import Path
 import pytest
 import requests
 import subprocess
 from types import SimpleNamespace
 
-from dpetl.load import github, load
+from dpetl.load import github, lfs, load
 
 
 class FakePackage:
@@ -109,6 +110,43 @@ def test_load_package_to_postgres(monkeypatch, dpetl_package, scoped_package):
     descriptor = json.loads(committed['datapackage.json'])
     assert descriptor['resources'] == [table]
     assert not [key for key in descriptor if key.startswith('dpetl_')]
+
+
+def test_load_package_with_lfs(monkeypatch, dpetl_package, scoped_package):
+    """With lfs, matching data files are uploaded and committed as pointers."""
+    mock_github(monkeypatch)
+    committed = {}
+    monkeypatch.setattr(
+        'dpetl.load.load.github.commit_remote',
+        lambda token, files, *a, **k: committed.update(files)
+    )
+    uploads = []
+    monkeypatch.setattr(lfs, 'get_gitattributes', lambda *a, **k: '')
+    monkeypatch.setattr(lfs, 'upload', lambda objects, endpoint, auth: uploads.append((list(objects), endpoint)))
+    package = scoped_package(dpetl_package, 'basic')
+    package.custom['dpetl_load']['lfs'] = {'threshold': 0}
+    [path] = [resource.path for resource in package.resources]
+    content = (Path(package.basepath) / path).read_bytes()
+
+    load.load_package(package)
+
+    assert uploads == [([path], 'https://github.com/test_owner/test_repo.git/info/lfs')]
+    assert committed[path] == lfs.pointer(content)[2]
+    assert f'{path} filter=lfs'.encode() in committed['.gitattributes']
+    assert 'lfs' not in json.loads(committed['datapackage.json']).get('dpetl_load', {})
+
+
+def test_load_package_rejects_files_over_github_limit(monkeypatch, dpetl_package, scoped_package, caplog):
+    """Without lfs, a file over the GitHub limit stops the load before committing."""
+    calls = mock_github(monkeypatch)
+    monkeypatch.setattr(lfs, 'GITHUB_LIMIT', 1e-6)
+    package = scoped_package(dpetl_package, 'basic')
+
+    with pytest.raises(SystemExit):
+        load.load_package(package)
+
+    assert 'rejected by GitHub' in caplog.text
+    assert 'commit_remote' not in calls
 
 
 def test_load_package_local_commit(monkeypatch, tmp_path):
@@ -436,3 +474,29 @@ def test_commit_local_with_deletions(monkeypatch):
     assert ['git', 'add', '-f', 'new_file.csv'] in commands
     assert any(cmd[0:3] == ['git', 'commit', '-m'] for cmd in commands)
     assert ['git', 'push'] in commands
+
+
+def test_commit_local_with_lfs(monkeypatch, tmp_path):
+    """LFS files are committed as pointers, keeping the data in the working tree."""
+    def git(*args, cwd=tmp_path / 'work'):
+        return subprocess.run(['git', *args], cwd=cwd, check=True, capture_output=True, text=True).stdout
+
+    git('init', '--bare', '-b', 'main', str(tmp_path / 'remote.git'), cwd=tmp_path)
+    git('clone', str(tmp_path / 'remote.git'), 'work', cwd=tmp_path)
+    git('config', 'user.email', 'test@example.com')
+    git('config', 'user.name', 'test')
+
+    work = tmp_path / 'work'
+    (work / 'data').mkdir()
+    (work / 'data' / 'big.csv.gz').write_bytes(b'big data')
+    (work / 'datapackage.json').write_text('{}')
+    monkeypatch.chdir(work)
+
+    files = {
+        'data/big.csv.gz': lfs.pointer(b'big data')[2],
+        'datapackage.json': b'{}',
+    }
+    github.commit_local(files, lfs_paths=['data/big.csv.gz'])
+
+    assert git('show', 'main:data/big.csv.gz', cwd=tmp_path / 'remote.git') == lfs.pointer(b'big data')[2].decode()
+    assert (work / 'data' / 'big.csv.gz').read_bytes() == b'big data'

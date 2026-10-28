@@ -1,3 +1,4 @@
+import json
 import logging
 import tempfile
 import pandas as pd
@@ -53,13 +54,16 @@ def get_source_settings(package):
     repo = github.get_repo_settings(package)
     target = load.get_target_settings(package)
 
-    return repo['owner'], repo['level'], repo['visibility'], target['target']
+    # Serialized so the settings can be compared in a set
+    lfs = json.dumps(package.custom.get('dpetl_load', {}).get('lfs'), sort_keys=True)
+
+    return repo['owner'], repo['level'], repo['visibility'], target['target'], lfs
 
 
 def get_load_settings(packages):
     """
     Build the destination settings from the source packages. All packages
-    must share the same owner, level, visibility and target. With target
+    must share the same owner, level, visibility, target and lfs. With target
     postgres, the tables go to the schema named after the linktable package.
     """
     settings = set(map(get_source_settings, packages))
@@ -67,23 +71,28 @@ def get_load_settings(packages):
     if len(settings) > 1:
         logger.error(
             'Packages in the linktable must share the same "owner", '
-            '"level", "visibility" and "target" in "dpetl_load".'
+            '"level", "visibility", "target" and "lfs" in "dpetl_load".'
         )
         raise SystemExit(1)
 
-    owner, level, visibility, target = settings.pop()
+    owner, level, visibility, target, lfs = settings.pop()
 
     if not owner:
         logger.error('Missing required field "owner" in "dpetl_load".')
         raise SystemExit(1)
 
-    return {
+    load_settings = {
         'owner': owner,
         'repo': REPO_NAME,
         'level': level,
         'visibility': visibility,
         'target': target,
     }
+
+    if lfs := json.loads(lfs):
+        load_settings['lfs'] = lfs
+
+    return load_settings
 
 
 def group_fact_tables(selected):

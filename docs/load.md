@@ -35,6 +35,8 @@ Reads its settings from the package's `dpetl_load` property:
 
 - `schema`: optional (defaults to the package name). Postgres schema that receives the tables when `target` is `postgres`.
 
+- `lfs`: optional. Sends large data files to Git LFS (see [Large files with Git LFS](#large-files-with-git-lfs)).
+
 If `repo` is set and the repository doesn't exist, dpetl creates it automatically.
 
 Before publishing, the `dpetl_extract`, `dpetl_transform`, `dpetl_load` and `dpetl_linktable` properties are removed from the descriptor.
@@ -75,6 +77,50 @@ dpetl_load:
 The data is loaded before the descriptor is committed. If the GitHub commit fails, the database is already up to date and the descriptor is updated on the next successful load.
 
 When a package already published on GitHub switches to `target: postgres`, its data files are removed from the repository on the next load (they remain in the Git history).
+
+## Large files with Git LFS
+
+GitHub rejects files larger than 100 MB. With `lfs`, data files larger than a threshold are sent to [Git LFS](https://git-lfs.com/) and only their LFS pointers are committed. It works for both remote (`repo` set) and local commits, and doesn't require `git-lfs` installed where dpetl runs.
+
+```yaml
+dpetl_load:
+  owner: github-username
+  repo: my-data-repo
+  lfs:
+    threshold: 50   # optional (Defaults to 50). Size in MB above which a file goes to LFS
+    patterns: [data/*.csv.gz, data-raw/*.csv.gz]   # optional (Defaults to any data file)
+    url: https://lfs.example.com/{owner}/{repo}   # optional (Defaults to the GitHub LFS storage)
+```
+
+`lfs: true` enables it with the defaults.
+
+- `threshold`: files larger than this size (in MB) go to LFS. Use `0` to send every file matching `patterns`.
+
+- `patterns`: only resource paths matching one of these patterns go to LFS. `*` doesn't cross folders (`data/*.csv.gz` doesn't match `data/2024/x.csv.gz`); use `**` for that.
+
+- `url`: endpoint of your own LFS server (e.g. [Giftless](https://github.com/datopian/giftless) or [rudolfs](https://github.com/jasonwhite/rudolfs)). `{owner}` and `{repo}` are replaced by the repository owner and name (taken from the `origin` remote for local commits). Without `url`, files go to the GitHub LFS storage of the repository, subject to GitHub's LFS storage and bandwidth quotas.
+
+Authentication:
+
+- **GitHub LFS storage:** uses the same `GH_TOKEN` or GitHub App as the load. No extra permission is needed beyond `Contents` read/write.
+
+- **Own server:** set `LFS_USERNAME` and `LFS_PASSWORD` (Basic authentication; for Giftless JWT tokens, use `_jwt` as the username and the token as the password). Without them, the server is used anonymously.
+
+On each load, dpetl:
+
+- uploads the files through the LFS batch API, skipping files the server already stores;
+
+- commits the LFS pointers in place of the files. On local commits the working tree keeps the data files and `git push` skips the `git-lfs` pre-push hook, since the files are already on the server;
+
+- keeps a block of `filter=lfs` rules, one per LFS file, in `.gitattributes`, between `# BEGIN dpetl lfs` and `# END dpetl lfs`. Rules outside the block are kept;
+
+- with `url`, commits a `.lfsconfig` pointing to the server, so clones download the files from it.
+
+The `datapackage.json` keeps the relative resource paths. They are valid in a clone with `git-lfs` installed, but reading a resource straight from GitHub (e.g. a `raw.githubusercontent.com` URL) returns the pointer instead of the data.
+
+Without `lfs`, or when a large file doesn't match `patterns`, the load stops before committing if a file exceeds 100 MB.
+
+If `lfs` is removed later, remove the dpetl block from `.gitattributes` (and the `.lfsconfig`) by hand.
 
 ## Retries and errors
 

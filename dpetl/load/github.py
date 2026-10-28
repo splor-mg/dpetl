@@ -138,12 +138,12 @@ def create_repo(token, owner, repo, level, visibility, **kwargs):
     r.raise_for_status()
 
 
-def get_remote_descriptor(owner, repo, token):
+def get_remote_file(owner, repo, token, path):
     """
-    Retrieve the datapackage.json currently committed to a GitHub repository.
-    Returns None if the repository has no descriptor yet.
+    Retrieve a file currently committed to a GitHub repository.
+    Returns None if the repository has no such file yet.
     """
-    url = f'https://api.github.com/repos/{owner}/{repo}/contents/datapackage.json'
+    url = f'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
     r = session.get(url, headers={'Authorization': f'Bearer {token}'})
 
     if r.status_code == 404:
@@ -151,6 +151,14 @@ def get_remote_descriptor(owner, repo, token):
 
     r.raise_for_status()
     return base64.b64decode(r.json()['content'])
+
+
+def get_remote_descriptor(owner, repo, token):
+    """
+    Retrieve the datapackage.json currently committed to a GitHub repository.
+    Returns None if the repository has no descriptor yet.
+    """
+    return get_remote_file(owner, repo, token, 'datapackage.json')
 
 
 def get_deletions(token, files, owner, repo, **kwargs):
@@ -174,9 +182,9 @@ def get_deletions(token, files, owner, repo, **kwargs):
     return previous_paths - current_paths
 
 
-def check_response(r, action):
+def check_response(r, action, service='GitHub API'):
     """
-    Log the GitHub error message and raise when a request failed.
+    Log the service error message and raise when a request failed.
     """
     if r.ok:
         return r
@@ -187,8 +195,8 @@ def check_response(r, action):
         message = r.text
 
     logger.error(
-        'GitHub API error while %s: %s %s',
-        action, r.status_code, message
+        '%s error while %s: %s %s',
+        service, action, r.status_code, message
     )
     r.raise_for_status()
 
@@ -314,16 +322,37 @@ def get_local_descriptor():
     return r.stdout if r.returncode == 0 else None
 
 
-def commit_local(files, deletions=()):
+def stage_content(path, content):
+    """
+    Stage a content for a path without touching the working tree file.
+    """
+    sha = subprocess.run(
+        ['git', 'hash-object', '-w', '--stdin'],
+        input=content, capture_output=True, check=True
+    ).stdout.decode().strip()
+
+    subprocess.run(
+        ['git', 'update-index', '--add', '--cacheinfo', f'100644,{sha},{path}'],
+        check=True
+    )
+
+
+def commit_local(files, deletions=(), lfs_paths=()):
     """
     Commit and push local repository changes.
-    Paths listed in `deletions` are removed from the repository.
+    Paths listed in `deletions` are removed from the repository, and paths
+    listed in `lfs_paths` are committed with their LFS pointer in `files`.
     """
     if deletions:
         logger.debug('Removing outdated resources: %s', ', '.join(deletions))
         subprocess.run(['git', 'rm', '-f', '--ignore-unmatch', *deletions], check=True)
 
-    subprocess.run(['git', 'add', '-f', *files.keys()], check=True)
+    # The working tree keeps the data, the commit gets the pointer
+    for path in lfs_paths:
+        stage_content(path, files[path])
+
+    staged = [path for path in files if path not in lfs_paths]
+    subprocess.run(['git', 'add', '-f', *staged], check=True)
 
     changes = subprocess.run(['git', 'diff', '--cached', '--quiet'])
     if changes.returncode == 0:
@@ -334,7 +363,10 @@ def commit_local(files, deletions=()):
 
     subprocess.run(['git', 'commit', '-m', f'update data package at: {timestamp}'], check=True)
 
-    subprocess.run(['git', 'push'], check=True)
+    # The objects are already on the LFS server: skip the git-lfs pre-push
+    # hook, which would look for them in the local LFS cache
+    push = ['git', 'push', '--no-verify'] if lfs_paths else ['git', 'push']
+    subprocess.run(push, check=True)
 
     commit_sha = subprocess.check_output(
         ['git', 'rev-parse', '--short', 'HEAD'],

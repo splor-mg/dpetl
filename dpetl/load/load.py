@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 from frictionless import helpers
 
-from dpetl.load import github, postgres
+from dpetl.load import github, lfs, postgres
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.load')
@@ -90,6 +90,7 @@ def load_package(package, **kwargs):
     # Prepare config and repository paths
     settings = github.get_repo_settings(package)
     target = get_target_settings(package)
+    lfs_settings = lfs.get_lfs_settings(package)
 
     load_dotenv(find_dotenv(usecwd=True))
     token = _get_token(settings['owner'])
@@ -109,10 +110,18 @@ def load_package(package, **kwargs):
     validate.validate_datapackage(package, **kwargs)
 
     # Prepare files to send
+    lfs_paths = []
+
     if target['target'] == 'postgres':
         files = load_postgres(package, target['schema'])
     else:
         files = read_files(package)
+
+        # Send large files to Git LFS, committing only their pointers
+        if lfs_settings:
+            lfs_paths = lfs.store(files, token, lfs_settings, **settings)
+
+    lfs.check_size(files, lfs_paths)
 
     # Commit all files in a single commit
     logger.debug('Committing data package.')
@@ -122,4 +131,4 @@ def load_package(package, **kwargs):
     if settings['repo']:
         github.commit_remote(token, files, deletions, **settings)
     else:
-        github.commit_local(files, deletions)
+        github.commit_local(files, deletions, lfs_paths)

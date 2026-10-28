@@ -281,12 +281,32 @@ def test_linktable_packages_fails_on_unknown_resource(tmp_path, capture_load, ca
     assert capture_load == []
 
 
+def test_linktable_packages_keeps_lfs_settings(tmp_path, capture_load):
+    """The lfs settings shared by the packages also apply to the linktable repo."""
+    lfs = {'url': 'https://lfs.example/splor/{repo}', 'patterns': ['data/*.csv.gz']}
+    packages = [
+        make_package(
+            tmp_path, name,
+            {name: 'ano,vlr_valor\n2024,100\n'},
+            dpetl_linktable={'resource_list': [name]},
+            dpetl_load={'owner': 'splor', 'repo': name, 'lfs': lfs},
+        )
+        for name in ('despesa', 'receita')
+    ]
+
+    linktable.linktable_packages(packages, no_validate=True)
+
+    [call] = capture_load
+    assert call['package'].custom['dpetl_load']['lfs'] == lfs
+
+
 @pytest.mark.parametrize('other_load', [
     {'owner': 'outro', 'repo': 'receita'},
     {'owner': 'splor', 'repo': 'receita', 'target': 'postgres'},
+    {'owner': 'splor', 'repo': 'receita', 'lfs': True},
 ])
 def test_linktable_packages_fails_on_divergent_load_settings(tmp_path, capture_load, other_load):
-    """Packages with different owners or targets cannot share a linktable destination."""
+    """Packages with different owners, targets or lfs cannot share a linktable destination."""
     packages = [
         make_package(
             tmp_path, name,
