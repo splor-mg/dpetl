@@ -14,7 +14,7 @@ Validation behavior depends on the command:
 
 - `transform`: validates each resource after transformation. Use `--validate-before` to validate the entire datapackage before processing.
 
-- `load`: validates before publishing only if `--validate-before` is used.
+- `load` and `linktable`: validate before publishing only if `--validate-before` is used.
 
 ## Flags
 

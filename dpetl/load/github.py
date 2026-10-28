@@ -138,12 +138,12 @@ def create_repo(token, owner, repo, level, visibility, **kwargs):
     r.raise_for_status()
 
 
-def get_remote_descriptor(owner, repo, token):
+def get_remote_file(owner, repo, token, path):
     """
-    Retrieve the datapackage.json currently committed to a GitHub repository.
-    Returns None if the repository has no descriptor yet.
+    Retrieve a file currently committed to a GitHub repository.
+    Returns None if the repository has no such file yet.
     """
-    url = f'https://api.github.com/repos/{owner}/{repo}/contents/datapackage.json'
+    url = f'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
     r = session.get(url, headers={'Authorization': f'Bearer {token}'})
 
     if r.status_code == 404:
@@ -151,6 +151,14 @@ def get_remote_descriptor(owner, repo, token):
 
     r.raise_for_status()
     return base64.b64decode(r.json()['content'])
+
+
+def get_remote_descriptor(owner, repo, token):
+    """
+    Retrieve the datapackage.json currently committed to a GitHub repository.
+    Returns None if the repository has no descriptor yet.
+    """
+    return get_remote_file(owner, repo, token, 'datapackage.json')
 
 
 def get_deletions(token, files, owner, repo, **kwargs):
@@ -164,13 +172,33 @@ def get_deletions(token, files, owner, repo, **kwargs):
     if not descriptor:
         return set()
 
+    # Only repository files can be deleted (not e.g. postgresql:// tables)
     previous_paths = {
         resource['path'] for resource in json.loads(descriptor).get('resources', [])
-        if 'path' in resource
+        if isinstance(resource.get('path'), str) and '://' not in resource['path']
     }
 
     current_paths = files.keys() - {'datapackage.json'}
     return previous_paths - current_paths
+
+
+def check_response(r, action, service='GitHub API'):
+    """
+    Log the service error message and raise when a request failed.
+    """
+    if r.ok:
+        return r
+
+    try:
+        message = r.json().get('message')
+    except ValueError:
+        message = r.text
+
+    logger.error(
+        '%s error while %s: %s %s',
+        service, action, r.status_code, message
+    )
+    r.raise_for_status()
 
 
 def commit_remote(token, files, deletions, owner, repo, **kwargs):
@@ -188,16 +216,17 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
 
     # Get repository information
     r = session.get(url, headers=headers)
-    r.raise_for_status()
+    check_response(r, f'reading repository {owner}/{repo}')
     branch = r.json()['default_branch']
 
     # Retrieve current HEAD commit and tree
     r = session.get(f'{url}/git/refs/heads/{branch}', headers=headers)
-    r.raise_for_status()
+    check_response(r, f'reading branch {branch}')
     sha = r.json()['object']['sha']
 
     r = session.get(f'{url}/git/commits/{sha}', headers=headers)
-    r.raise_for_status()
+    check_response(r, f'reading commit {sha}')
+
     base_tree = r.json()['tree']['sha']
 
     # Create blobs for each file
@@ -211,14 +240,13 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
                 'encoding': 'base64'
             }
         )
-        r.raise_for_status()
-        blob = r.json()
+        check_response(r, f'uploading {path} ({len(content) / 1e6:.1f} MB)')
 
         items.append({
             'path': path,
             'mode': '100644',
             'type': 'blob',
-            'sha': blob['sha']
+            'sha': r.json()['sha']
         })
 
     # Remove resources that no longer belong to the data package
@@ -242,7 +270,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
             'tree': items
         }
     )
-    r.raise_for_status()
+    check_response(r, 'creating the file tree')
     tree = r.json()
 
     if tree['sha'] == base_tree:
@@ -261,7 +289,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
             'parents': [sha]
         }
     )
-    r.raise_for_status()
+    check_response(r, 'creating the commit')
     new_commit = r.json()
 
     # Update branch to new commit
@@ -270,7 +298,7 @@ def commit_remote(token, files, deletions, owner, repo, **kwargs):
         headers=headers,
         json={'sha': new_commit['sha']}
     )
-    r.raise_for_status()
+    check_response(r, f'updating branch {branch}')
 
     logger.info(
         'Successfully committed %d files to %s/%s. Commit=%s Files=[%s]',
@@ -294,16 +322,37 @@ def get_local_descriptor():
     return r.stdout if r.returncode == 0 else None
 
 
-def commit_local(files, deletions=()):
+def stage_content(path, content):
+    """
+    Stage a content for a path without touching the working tree file.
+    """
+    sha = subprocess.run(
+        ['git', 'hash-object', '-w', '--stdin'],
+        input=content, capture_output=True, check=True
+    ).stdout.decode().strip()
+
+    subprocess.run(
+        ['git', 'update-index', '--add', '--cacheinfo', f'100644,{sha},{path}'],
+        check=True
+    )
+
+
+def commit_local(files, deletions=(), lfs_paths=()):
     """
     Commit and push local repository changes.
-    Paths listed in `deletions` are removed from the repository.
+    Paths listed in `deletions` are removed from the repository, and paths
+    listed in `lfs_paths` are committed with their LFS pointer in `files`.
     """
     if deletions:
         logger.debug('Removing outdated resources: %s', ', '.join(deletions))
         subprocess.run(['git', 'rm', '-f', '--ignore-unmatch', *deletions], check=True)
 
-    subprocess.run(['git', 'add', '-f', *files.keys()], check=True)
+    # The working tree keeps the data, the commit gets the pointer
+    for path in lfs_paths:
+        stage_content(path, files[path])
+
+    staged = [path for path in files if path not in lfs_paths]
+    subprocess.run(['git', 'add', '-f', *staged], check=True)
 
     changes = subprocess.run(['git', 'diff', '--cached', '--quiet'])
     if changes.returncode == 0:
@@ -314,7 +363,10 @@ def commit_local(files, deletions=()):
 
     subprocess.run(['git', 'commit', '-m', f'update data package at: {timestamp}'], check=True)
 
-    subprocess.run(['git', 'push'], check=True)
+    # The objects are already on the LFS server: skip the git-lfs pre-push
+    # hook, which would look for them in the local LFS cache
+    push = ['git', 'push', '--no-verify'] if lfs_paths else ['git', 'push']
+    subprocess.run(push, check=True)
 
     commit_sha = subprocess.check_output(
         ['git', 'rev-parse', '--short', 'HEAD'],

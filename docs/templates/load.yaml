@@ -4,3 +4,13 @@ dpetl_load:
   repo: my-data-repo
   level: user   # optional (Defaults to user)
   visibility: private   # optional (Defaults to private)
+  target: github   # optional (Defaults to github). Use postgres to load data into Postgres
+  # schema: my_schema   # optional (Defaults to the package name). Postgres schema used when target: postgres
+  # lfs:   # optional. Sends large data files to Git LFS (or lfs: true for the defaults)
+  #   threshold: 50   # optional (Defaults to 50). Size in MB above which a file goes to LFS
+  #   patterns: [data/*.csv.gz]   # optional (Defaults to any data file)
+  #   url: https://lfs.example.com/{owner}/{repo}   # optional (Defaults to the GitHub LFS storage)
+
+# Linktable configuration (defined once per package, optional)
+# dpetl_linktable:
+#   resource_list: [execucao, empenho]   # required. Resources used to build the cross-package linktable

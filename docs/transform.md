@@ -30,6 +30,8 @@ These are read from the resource's `dpetl_transform` property:
 
 - `delimiter`: optional (defaults to `,`). Field separator used for `csv`/`txt` files.
 
+- `package_linktable`: optional (defaults to `false`). If `true`, the resource takes part in the package's linktable (see [Package linktable](#package-linktable)).
+
 ### `cli`
 
 Runs shell commands as a complement to or replacement for the built‑in pipeline:
@@ -79,6 +81,20 @@ Supported `method` values:
     - Other characters are literals.
 
 You can also add a `filter` condition (a Python expression) to control which rows are anonymized.
+
+## Package linktable
+
+Builds a linktable **inside a single data package**, from the resources that set `package_linktable: true`. To build a linktable across several data packages, use the [`linktable`](linktable.md) command instead.
+
+For each of these resources, after its transformation:
+
+- Fields starting with `vlr_` are **facts**; every other field is a **dimension**.
+
+- A fact table `fact_<resource>.csv.gz` is written with the facts and a `key_<resource>` column, built by joining the dimension values with `|` (e.g. `2024|A`).
+
+After all resources are processed, the distinct dimension rows of every resource are combined into `linktable.csv.gz`, with one `key_<resource>` column per resource. Dimensions with the same name in different resources share a single column.
+
+Files are written to a `linktable` folder next to the first resource's file, and the linktable is added to the package as a resource named `linktable`.
 
 > **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
 
