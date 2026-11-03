@@ -122,6 +122,17 @@ Without `lfs`, or when a large file doesn't match `patterns`, the load stops bef
 
 If `lfs` is removed later, remove the dpetl block from `.gitattributes` (and the `.lfsconfig`) by hand.
 
+!!! warning "GitHub LFS quotas and billing"
+
+    Without `url`, files go to the GitHub LFS storage, which has a free quota per account (10 GiB of storage and 10 GiB of bandwidth on the free plans). Keep in mind that:
+
+    - LFS stores files by content: every load with updated data adds a new version to the storage, and old versions stay there, counting toward the quota. Individual LFS objects can't be deleted; only deleting the repository (or contacting GitHub support) frees the space.
+    - Downloads by anyone, including clones of public repositories, count toward the owner's bandwidth.
+    - With a payment method, usage above the quota is billed automatically unless a budget limits it (a $0 budget blocks LFS for the rest of the month instead of billing).
+    - Without a payment method, usage is blocked when the quota runs out: clones get only the pointers, new files can't be uploaded (the load fails) and, once the bandwidth is used up, LFS is disabled until the next month.
+
+    Check the current quotas and prices in [GitHub's Git LFS billing documentation](https://docs.github.com/en/billing/concepts/product-billing/git-lfs). For large or frequently updated files, consider your own LFS server (`url`).
+
 ## Retries and errors
 
 Requests to the GitHub API are retried up to 5 times on rate limits and temporary server errors. If they still fail, the load stops with an `HTTPError` and no commit is made.
