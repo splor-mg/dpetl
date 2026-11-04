@@ -21,6 +21,12 @@ dpetl -d datapackages/despesa/datapackage.json -d datapackages/receita/datapacka
 
 - **Across data packages** (no `-d`, or several `-d`): the linktable is built from every package with `dpetl_linktable` (or only the given ones). `--name` is required, and fact tables are prefixed by the package name (`fact_<package>_<resource>`, `key_<package>_<resource>`), keeping resources with the same name in different packages apart.
 
+The mode depends **only on `-d`**, not on how many packages are found. Without `-d`, the command reads `./datapackage.json` when it exists (otherwise `datapackages/*/datapackage.json`), and even a single package found this way is built across data packages: `--name` is required and fact tables are prefixed. To build the linktable of the package in the current folder, pass it with `-d`:
+
+```bash
+dpetl -d datapackage.json linktable
+```
+
 ## Configuration
 
 Each package opts in through the package-level `dpetl_linktable` property:
