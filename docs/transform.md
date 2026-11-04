@@ -58,6 +58,18 @@ Any field in the resource schema may define additional properties to modify its 
 
 If a field defines a `target` property, the field is renamed to the specified target value. After transformation, the `target` property is removed.
 
+### `replace`
+
+Replaces parts of the field's values, as `{regex: replacement}`. Each regex is applied in order, before `join` and `anonymize`.
+
+- Use `''` as replacement to remove the matched text.
+
+- Escape special characters (`'\.'`) or use brackets (`'[.-]'`) to match them literally.
+
+- Use `^` and `$` to replace only the whole value, e.g. `'^INICIADO$': iniciado`.
+
+Values that are not strings, such as missing values, are kept.
+
 ### `join`
 
 Adds columns from a .csv file. Useful for attaching labels or descriptions to codes.
@@ -75,6 +87,14 @@ Adds columns from a .csv file. Useful for attaching labels or descriptions to co
 Unmatched rows get empty values. Identical duplicate rows are dropped; for a key with different values, the first row is kept.
 
 > **Tip:** use `dpetl --verbose` to see details about the join.
+
+### `compute`
+
+Adds columns computed by Python expressions, as `{name: expression}`. Useful for combining or deriving values from other fields.
+
+Each expression is evaluated per row, with the row's values available by field name (e.g. `'elemento_cod + item_cod.zfill(2)'`).
+
+The columns are added right after the field, as `string` fields, after `join` and before `anonymize`.
 
 ### `anonymize`
 
