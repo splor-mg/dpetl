@@ -42,19 +42,19 @@ def test_descriptor_iteration_fallback_datapackage_yaml(monkeypatch, tmp_path):
 
 
 def test_descriptor_iteration_multiple_descriptors(monkeypatch, tmp_path):
-    """Every datapackage.yaml under datapackages/ is processed."""
-    for name in ('pkg1', 'pkg2'):
+    """Every datapackage.yaml under datapackages/ is processed, in alphabetical order."""
+    for name in ('pkg2', 'pkg1'):
         path = tmp_path / 'datapackages' / name / 'datapackage.yaml'
         path.parent.mkdir(parents=True)
         path.touch()
     monkeypatch.chdir(tmp_path)
 
     calls = track_calls(monkeypatch, 'dpetl.extract.extract.extract_package')
-    monkeypatch.setattr('dpetl.helpers.iterator.Package', lambda path: Package(name='test_pkg'))
+    monkeypatch.setattr('dpetl.helpers.iterator.Package', lambda path: Package(name=path.parent.name))
 
     descriptor_iteration(operation='extract')
 
-    assert len(calls) == 2
+    assert calls == ['pkg1', 'pkg2']
 
 
 def test_descriptor_iteration_with_load_operation_and_json_fallback(monkeypatch, tmp_path):

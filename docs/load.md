@@ -7,6 +7,8 @@ Runs the ETL load phase. Uploads transformed data and the updated `datapackage.j
 dpetl load
 ```
 
+> **Tip:** Set `dpetl_load: false` on a package or resource to skip it.
+
 ## Authentication
 
 dpetl supports two authentication methods:
@@ -30,6 +32,12 @@ Reads its settings from the package's `dpetl_load` property:
 - `level`: optional (defaults to `user`). Use `orgs` to target a GitHub organization instead of a user account.
 
 - `visibility`: optional (defaults to `private`). Use `public` for a public repository.
+
+- `mode`: optional (defaults to `api`). How the files are sent when `repo` is set:
+
+    - `api`: uses the GitHub API, without cloning the repository.
+
+    - `git`: for files too large for the API. Uses a temporary clone and sends files over 100 MB with Git LFS (requires `git-lfs`).
 
 If `repo` is set and the repository doesn't exist, dpetl creates it automatically.
 
