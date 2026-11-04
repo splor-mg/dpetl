@@ -91,6 +91,31 @@ def test_linktable_packages_builds_fact_tables_and_linktable(tmp_path):
     assert len(table) == 3
 
 
+def test_linktable_packages_keys_match_with_unshared_integer_dimension(tmp_path):
+    """An integer dimension missing from other resources keeps its format in the
+    linktable keys (no 4239.0), so they match the fact table keys."""
+    despesa = make_package(
+        tmp_path, 'despesa',
+        {'execucao': 'ano,acao_cod,ativo,vlr_empenhado\n2026,4239,true,100\n2026,4240,false,200\n'},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
+    )
+    receita = make_package(
+        tmp_path, 'receita',
+        {'arrecadacao': 'ano,uf,vlr_receita\n2026,MG,10\n'},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['arrecadacao']},
+    )
+
+    linktable.linktable_packages([despesa, receita], name='orcamento')
+
+    _, files = read_output(tmp_path, 'orcamento')
+    fact_keys = files['fact_despesa_execucao.csv.gz']['key_despesa_execucao'].tolist()
+    assert fact_keys == ['2026|4239|True', '2026|4240|False']
+
+    table = files['linktable.csv.gz']
+    assert set(fact_keys) <= set(table['key_despesa_execucao'])
+    assert table['acao_cod'].dropna().tolist() == ['4239', '4240']
+
+
 def test_linktable_packages_with_several_descriptors_is_across_packages(tmp_path):
     """Several -d also build the linktable across packages, so --name is required."""
     packages = [

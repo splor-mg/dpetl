@@ -210,7 +210,12 @@ def group_fact_tables(selected, prefix=True):
                 )
                 raise SystemExit(1)
 
-            group['frames'].append(resource.to_pandas())
+            # Dimensions as text before any concat: a column missing from
+            # some frames would otherwise turn integers into floats in the
+            # keys (4239 -> 4239.0)
+            df = resource.to_pandas()
+            df[dimensions] = df[dimensions].astype('string')
+            group['frames'].append(df)
 
     return groups
 
