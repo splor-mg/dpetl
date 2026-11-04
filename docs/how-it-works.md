@@ -6,23 +6,40 @@ By default, the CLI looks for:
 
 - `datapackage.yaml` when running `extract` or `transform`
 
-- `datapackage.json` when running `load`
+- `datapackage.json` when running `load` or `linktable`
 
 If you have **multiple data packages**, place them in a `datapackages/` folder (each in its own subdirectory) and dpetl will process all of them.
 
 You can also **specify one or more descriptors** manually using the `-d` or `--descriptor` flag (it can be passed multiple times). This is useful when you want to test a specific configuration or process a file that is not in the default location.
 
+`-d` is a global flag, so it goes **before** the command name:
+
 ```bash
 # Single descriptor
-dpetl transform -d configs/datapackage_payroll.yaml
+dpetl -d configs/datapackage_payroll.yaml transform
 
 # Multiple descriptors
-dpetl extract -d datapackages/sales/datapackage.yaml -d datapackages/hr/datapackage.yaml
+dpetl -d datapackages/sales/datapackage.yaml -d datapackages/hr/datapackage.yaml extract
 ```
+
+## Order of the commands
+
+Each command reads what the previous one wrote, so they run in this order:
+
+```bash
+dpetl extract                      # downloads the source files
+dpetl transform                    # reads datapackage.yaml, writes the files and datapackage.json
+dpetl linktable --name payroll   # optional. Reads datapackage.json, writes datapackages/payroll/
+dpetl load                         # reads datapackage.json and publishes each package
+```
+
+- `transform` writes the `datapackage.json` that `load` and `linktable` read. Run it again whenever the `datapackage.yaml` or the source data change.
+
+- `linktable` does not publish anything: it saves a new data package in `datapackages/<name>/`. Run it **before** `load`, so that `load` (without `-d`) publishes the linktable package together with the other packages. Set its `dpetl_load` first (see [Linktable](linktable.md#publishing)).
 
 ## Skipping a command
 
-You can **skip a command entirely for a given package** by setting `enabled: false` under the corresponding `dpetl_extract`, `dpetl_transform` or `dpetl_load` key at the package level in the descriptor.
+You can **skip a command entirely for a given package** by setting `enabled: false` under the corresponding `dpetl_extract`, `dpetl_transform`, `dpetl_load` or `dpetl_linktable` key at the package level in the descriptor.
 
 ```yaml
 # full form

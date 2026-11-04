@@ -80,8 +80,6 @@ Supported `method` values:
 
 You can also add a `filter` condition (a Python expression) to control which rows are anonymized.
 
-> **Note:** `updated_at` timestamp is added to the package, and the updated descriptor is saved as a JSON file.
-
 ## Example
 
 Resources use `dpetl_transform` and the field properties described above. See the [complete example](example.md).

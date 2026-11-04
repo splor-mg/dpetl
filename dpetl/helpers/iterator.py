@@ -5,28 +5,45 @@ from frictionless import Package
 from dpetl.extract import extract
 from dpetl.transform import transform
 from dpetl.load import load
+from dpetl.linktable import linktable
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_descriptors(operation=None, descriptor=None, **kwargs):
+    """
+    Resolve which package descriptor(s) an operation should read.
+    Returns None when no descriptor is found.
+    """
+    default = ('datapackage.json' if operation in {'load', 'linktable'}
+               else 'datapackage.yaml')
+
+    if descriptor:
+        return [Path(path) for path in descriptor]
+
+    if Path(default).exists():
+        return [Path(default)]
+
+    if Path('datapackages').is_dir():
+        return list(Path('datapackages').glob(f'*/{default}'))
+
+    logger.error('No descriptor found.')
+    return None
 
 
 def descriptor_iteration(**kwargs):
     """
     Iterate on package(s) descriptor(s) and apply a function to each package.
     """
-    default = ('datapackage.json' if kwargs.get('operation') == 'load'
-               else 'datapackage.yaml')
+    descriptors = resolve_descriptors(**kwargs)
 
-    if kwargs.get('descriptor'):
-        descriptors = [Path(descriptor) for descriptor in kwargs.get('descriptor')]
+    if descriptors is None:
+        return
 
-    elif Path(default).exists():
-        descriptors = [Path(default)]
-
-    elif Path('datapackages').is_dir():
-        descriptors = Path('datapackages').glob(f'*/{default}')
-
-    else:
-        logger.error('No descriptor found.')
+    # Linktable combines all packages at once instead of one at a time
+    if kwargs.get('operation') == 'linktable':
+        packages = [Package(descriptor) for descriptor in descriptors]
+        linktable.linktable_packages(packages, **kwargs)
         return
 
     for descriptor in descriptors:

@@ -31,5 +31,6 @@ All variables above can also be set in a `.env` file in the current directory in
 | `GH_APP_ID` | load | GitHub App ID |
 | `GH_APP_PRIVATE_KEY` | load | GitHub App private key |
 | `GH_APP_INSTALLATION_ID` | load | GitHub App installation ID (optional) |
+| `PG_URL` | load (`target: postgres`) | Postgres connection URL, e.g. `postgresql://user:password@host:5432/database` |
 
 **\* Proxy notes:** If your network requires a proxy, dpetl supports both uppercase and lowercase proxy environment variables. Use the format `http://user:pwd@host:port` when authentication is required.

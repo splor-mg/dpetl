@@ -4,9 +4,9 @@ Integration tests for the transformation module.
 import json
 import os
 import subprocess
-
 import petl as etl
 import pytest
+
 from frictionless import Package, Resource
 
 from dpetl.transform import command, datapackage, transform

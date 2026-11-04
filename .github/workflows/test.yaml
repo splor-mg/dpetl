@@ -54,7 +54,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --extras github-app
+        run: poetry install --no-interaction --extras "github-app postgres"
 
       - name: Run tests
         run: poetry run task test

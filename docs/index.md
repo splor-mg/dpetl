@@ -28,6 +28,18 @@ pip install dpetl[github-app]
 poetry install --extras github-app
 ```
 
+To load data into Postgres (see [Loading to Postgres](load.md#loading-to-postgres)), install with:
+
+```bash
+# using pip
+pip install "dpetl[postgres]"
+
+# using poetry
+poetry add "dpetl[postgres]"
+```
+
+Extras can be combined, e.g. `dpetl[github-app,postgres]`.
+
 ## Usage
 
 Activate your virtual environment!

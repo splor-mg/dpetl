@@ -1,5 +1,5 @@
 """
-Integration tests for CLI commands: extract, transform, load.
+Integration tests for CLI commands: extract, transform, load, linktable.
 Tests both command dispatching (via mocks) and the full integration flow.
 """
 import re
@@ -31,15 +31,28 @@ def test_extract_command_flags(mock_descriptor_iteration, args, expected):
         assert kwargs[key] == value
 
 
-@pytest.mark.parametrize('command', ['transform', 'load'])
+@pytest.mark.parametrize('command', ['transform', 'load', 'linktable'])
 def test_command_calls_descriptor_iteration(mock_descriptor_iteration, command):
-    """transform/load dispatch to descriptor_iteration with the matching operation."""
+    """transform/load/linktable dispatch to descriptor_iteration with the matching operation."""
     result = runner.invoke(app, [command], obj={'no_validate': True, 'no_stop': True})
 
     assert result.exit_code == 0
     kwargs = mock_descriptor_iteration[0]
     assert kwargs['operation'] == command
     assert kwargs.get('descriptor') is None
+
+
+@pytest.mark.parametrize('args, expected', [
+    ([], None),
+    (['--name', 'orcamento'], 'orcamento'),
+    (['-n', 'orcamento'], 'orcamento'),
+])
+def test_linktable_command_name(mock_descriptor_iteration, args, expected):
+    """linktable passes --name on to descriptor_iteration."""
+    result = runner.invoke(app, ['linktable'] + args, obj={'no_validate': True, 'no_stop': True})
+
+    assert result.exit_code == 0
+    assert mock_descriptor_iteration[0]['name'] == expected
 
 
 def test_transform_keygen_command():
