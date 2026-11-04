@@ -48,6 +48,8 @@ The CLI reads the Data Package descriptor:
 
 Then it runs each phase on its resources, following the `dpetl_extract`, `dpetl_transform`, `dpetl_load` and `dpetl_linktable` properties declared in it.
 
+Run the commands in order: `extract` → `transform` → `linktable` (optional) → `load`. `transform` writes the `datapackage.json` read by `load` and `linktable`, and `linktable` saves a new data package in `datapackages/<name>/` that `load` publishes with the others.
+
 If you have more than one data package, place each one in its own subdirectory of `datapackages/`.
 
 ## Documentation

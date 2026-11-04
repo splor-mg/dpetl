@@ -7,13 +7,13 @@ Builds fact tables and a linktable as a **new data package**, saved to `datapack
 dpetl -d datapackages/despesa/datapackage.json linktable
 
 # Across every datapackages/*/datapackage.json with dpetl_linktable
-dpetl linktable --name orcamento
+dpetl linktable --name payroll
 
 # Across specific packages
-dpetl -d datapackages/despesa/datapackage.json -d datapackages/receita/datapackage.json linktable --name orcamento
+dpetl -d datapackages/despesa/datapackage.json -d datapackages/receita/datapackage.json linktable --name payroll
 ```
 
-**Remember:** run `dpetl transform` before `dpetl linktable`. The command reads the transformed `datapackage.json` of each package, so field renames (`target`) and anonymization are already applied, and dimensions with the same name in different packages represent the same data. dpetl does not check whether `transform` is up to date, but it stops when a resource has no schema fields.
+**Remember:** run `dpetl transform` before `dpetl linktable`, and `dpetl load` after it to publish the generated package (see [Order of the commands](how-it-works.md#order-of-the-commands)). The command reads the transformed `datapackage.json` of each package, so field renames (`target`) and anonymization are already applied, and dimensions with the same name in different packages represent the same data. dpetl does not check whether `transform` is up to date, but it stops when a resource has no schema fields.
 
 ## Modes
 
