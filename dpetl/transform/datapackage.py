@@ -109,7 +109,9 @@ def update_metadata(resource, path, format, compression, extension, encoding, de
     # Remove custom property from all fields
     for field in schema:
         field.custom.pop('target', None)
+        field.custom.pop('replace', None)
         field.custom.pop('join', None)
+        field.custom.pop('compute', None)
         field.custom.pop('anonymize', None)
 
     # Clear extrapaths and infer schema from the output file

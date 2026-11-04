@@ -3,7 +3,7 @@ import logging
 import petl as etl
 from dotenv import load_dotenv, find_dotenv
 
-from dpetl.transform import anonymize, command, datapackage, join
+from dpetl.transform import anonymize, command, compute, datapackage, join, replace, replace
 from dpetl.helpers import validate
 
 logger = logging.getLogger('dpetl.transform')
@@ -47,8 +47,14 @@ def transform_package(package, **kwargs):
                     table = etl.rename(table, field.name, target)
                     field.name = target
 
+                # Replace parts of the values
+                table = replace.apply_replace(field, table)
+
                 # Add columns from other files
                 table = join.apply_join(resource.schema, field, table, report)
+
+                # Add columns computed from other fields
+                table = compute.apply_compute(resource.schema, field, table)
 
                 # Anonymize field
                 table = anonymize.apply_anonymization(field, table, secret_key)

@@ -38,6 +38,20 @@
           anonymize:
             method: '[###-***-####]'
 
+  # Replace parts of the values
+  - name: revenues
+    path: data/revenues.csv
+    schema:
+      fields:
+        - name: revenue_code
+          type: string
+          replace:
+            '[.-]': ''   # {regex: replacement}, applied in order
+        - name: status
+          type: string
+          replace:
+            '^TEXT$': text
+
   # Join columns from another file
   - name: sales
     path: data/sales.csv
@@ -52,6 +66,18 @@
             columns: {name: product_name, category: category}   # required. Columns to add, in order
             key: product_code   # optional (Defaults to the field name)
             by: {year: year}   # optional. {field in the resource: column in the file}
+
+  # Columns computed from other fields
+  - name: expenses
+    path: data/expenses.csv
+    schema:
+      fields:
+        - name: element_code
+          type: string
+        - name: item_code
+          type: string
+          compute:
+            element_item_code: 'element_code + item_code.zfill(2)'   # {name: Python expression}
 
   # External command
   - name: payroll
