@@ -13,4 +13,8 @@ dpetl_load:
 
 # Linktable configuration (defined once per package, optional)
 # dpetl_linktable:
-#   resource_list: [execucao, empenho]   # required. Resources used to build the cross-package linktable
+#   facts: ['vlr_*']   # required. Field names or glob patterns of the facts ([] for dimensions only)
+#   resource_list:   # required. Resources used to build the linktable
+#     - execucao   # uses the package facts
+#     - name: empenho   # overrides the package facts for this resource
+#       facts: ['vlr_*', 'qtd_*']
