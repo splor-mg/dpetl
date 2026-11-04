@@ -25,7 +25,9 @@ dpetl -d datapackages/despesa/datapackage.json -d datapackages/receita/datapacka
 
 Each package opts in through the package-level `dpetl_linktable` property:
 
-- `resource_list`: required. Names of the resources used to build the linktable.
+- `resource_list`: required. Resources used to build the linktable: a resource name, or `{name, facts}` to set the facts of that resource.
+
+- `facts`: required. Fields that are **facts**; every other field is a **dimension**. Each item is a field name or a glob pattern (`*` any characters, `?` one character, `[abc]` one of the characters), matched against the field names of the transformed `datapackage.json` (after `target` renames). A single pattern may be given as a string, and `[]` means the resources have dimensions only. Applies to every resource in `resource_list` that does not set its own `facts`, and is required even when all of them do.
 
 - `enabled`: optional (defaults to `true`). Set it to `false` (or use the shorthand `dpetl_linktable: false`) to leave the package out.
 
@@ -33,7 +35,13 @@ Packages without `dpetl_linktable` are skipped.
 
 ```yaml
 dpetl_linktable:
-  resource_list: [execucao, empenho]
+  facts: ['vlr_*']               # required
+  resource_list:
+    - execucao                   # uses the package facts
+    - name: empenho              # overrides the package facts
+      facts: ['vlr_*', 'qtd_*', total_pago]
+    - name: orgao                # dimensions only
+      facts: []
 ```
 
 The `linktable` command takes one option, after the command name:
@@ -44,7 +52,7 @@ The `linktable` command takes one option, after the command name:
 
 ## How it works
 
-- Each listed resource becomes a fact table `data/fact_<name>.csv.gz`: fields starting with `vlr_` are **facts**, every other field is a **dimension**, and a `key_<name>` column joins the dimension values with `|` (e.g. `2024|A`).
+- Each listed resource becomes a fact table `data/fact_<name>.csv.gz`: fields matching `facts` are **facts**, every other field is a **dimension**, and a `key_<name>` column joins the dimension values with `|` (e.g. `2024|A`).
 
 - Across data packages, resources with the same package **and** resource names — typically the same package in different years — are **stacked** into a single fact table. They must have the same dimensions and facts, and the year must be one of the dimensions (e.g. an `ano` field); otherwise rows from different years get the same key.
 
@@ -72,8 +80,14 @@ The command stops with an error, before anything is written, when:
 
 - `--name` points to the folder of a source package (a package used to build the linktable, or a folder with a `datapackage.yaml`);
 
-- a package enables `dpetl_linktable` without a `resource_list`;
+- a package enables `dpetl_linktable` without a `resource_list` or without `facts`;
 
 - a resource in `resource_list` does not exist in the package, or has no schema fields;
 
+- `facts` is not a list of field names or patterns, or a `resource_list` item is neither a name nor `{name, facts}`;
+
+- a field name in `facts` (an item without wildcards) is not a field of the resource. Patterns matching no field are fine, so a package-wide `facts` may list patterns some resources do not use;
+
 - stacked resources (same package and resource names) have different dimensions or facts.
+
+A resource with no facts, or no dimensions, is built with a warning.

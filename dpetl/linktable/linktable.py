@@ -1,5 +1,6 @@
 import re
 import json
+import fnmatch
 import logging
 import pandas as pd
 from pathlib import Path
@@ -15,15 +16,41 @@ OUTPUT_PATH = Path('datapackages')
 NAME_PATTERN = re.compile(r'^[a-z0-9._-]+$')
 
 
-def split_fields(resource):
+def split_fields(resource, patterns):
     """
-    Split the resource fields into dimensions and facts (fields starting
-    with vlr_).
+    Split the resource fields into dimensions and facts (fields matching
+    any of the glob patterns, e.g. vlr_*).
     """
     names = [field.name for field in resource.schema.fields]
-    dimensions = [name for name in names if not name.startswith('vlr_')]
-    facts = [name for name in names if name.startswith('vlr_')]
+
+    def is_fact(name):
+        return any(fnmatch.fnmatchcase(name, p) for p in patterns)
+
+    dimensions = [name for name in names if not is_fact(name)]
+    facts = [name for name in names if is_fact(name)]
     return dimensions, facts
+
+
+def get_facts(config, package, owner):
+    """
+    Return the facts patterns of a dpetl_linktable entry (the package or a
+    resource_list item). A single pattern may be given as a string.
+    """
+    facts = config.get('facts')
+
+    if isinstance(facts, str):
+        facts = [facts]
+
+    if facts is not None and (
+            not isinstance(facts, list)
+            or not all(isinstance(pattern, str) for pattern in facts)):
+        logger.error(
+            '"facts" of %s in package %s must be a list of field names '
+            'or patterns.', owner, package.name
+        )
+        raise SystemExit(1)
+
+    return facts
 
 
 def build_key(df, dimensions):
@@ -66,8 +93,10 @@ def create_linktable(package_dimensions, resource_dfs, linktable_path, basepath)
 
 def get_resource_list(package):
     """
-    Return the resources a package contributes to the linktable,
-    or None when the package does not take part in it.
+    Return the resources a package contributes to the linktable, each with
+    its facts patterns, or None when the package does not take part in it.
+    A resource_list item is a resource name or {name, facts}; facts default
+    to the package facts, which are required.
     """
     config = package.custom.get('dpetl_linktable') or {}
     enabled = config if isinstance(config, bool) else config.get('enabled', True)
@@ -85,7 +114,32 @@ def get_resource_list(package):
         )
         raise SystemExit(1)
 
-    missing = [name for name in resource_list if not package.has_resource(name)]
+    package_facts = get_facts(config, package, 'dpetl_linktable')
+
+    if package_facts is None:
+        logger.error(
+            'Missing required field "facts" in "dpetl_linktable" for '
+            'package %s. Use [] for packages with dimensions only.',
+            package.name
+        )
+        raise SystemExit(1)
+
+    items = []
+    for item in resource_list:
+        if isinstance(item, str):
+            item = {'name': item}
+
+        if not isinstance(item, dict) or not isinstance(item.get('name'), str):
+            logger.error(
+                'Invalid "resource_list" item in package %s: %s. Use a '
+                'resource name or {name, facts}.', package.name, item
+            )
+            raise SystemExit(1)
+
+        facts = get_facts(item, package, f'resource {item["name"]}')
+        items.append((item['name'], package_facts if facts is None else facts))
+
+    missing = [name for name, _ in items if not package.has_resource(name)]
 
     if missing:
         logger.error(
@@ -94,7 +148,7 @@ def get_resource_list(package):
         )
         raise SystemExit(1)
 
-    return [package.get_resource(name) for name in resource_list]
+    return [(package.get_resource(name), facts) for name, facts in items]
 
 
 def group_fact_tables(selected, prefix=True):
@@ -107,10 +161,10 @@ def group_fact_tables(selected, prefix=True):
     groups = {}
 
     for package, resources in selected:
-        for resource in resources:
+        for resource, patterns in resources:
             name = (f'{package.name}_{resource.name}' if prefix
                     else resource.name)
-            dimensions, facts = split_fields(resource)
+            dimensions, facts = split_fields(resource, patterns)
 
             if not dimensions and not facts:
                 logger.error(
@@ -119,6 +173,26 @@ def group_fact_tables(selected, prefix=True):
                     resource.name, package.name
                 )
                 raise SystemExit(1)
+
+            # Field names (no wildcard) are likely typos when not found
+            unknown = [
+                pattern for pattern in patterns
+                if not any(char in pattern for char in '*?[')
+                and pattern not in facts
+            ]
+            if unknown:
+                logger.error(
+                    'Facts not found in resource %s of package %s: %s.',
+                    resource.name, package.name, ', '.join(unknown)
+                )
+                raise SystemExit(1)
+
+            if not facts or not dimensions:
+                logger.warning(
+                    'Resource %s of package %s has no %s.',
+                    resource.name, package.name,
+                    'facts' if not facts else 'dimensions'
+                )
 
             group = groups.setdefault(name, {
                 'dimensions': dimensions,

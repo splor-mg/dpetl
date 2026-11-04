@@ -62,12 +62,12 @@ def test_linktable_packages_builds_fact_tables_and_linktable(tmp_path):
     despesa = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,orgao,vlr_empenhado\n2024,A,100\n2024,B,200\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
     receita = make_package(
         tmp_path, 'receita',
         {'arrecadacao': 'ano,uf,vlr_receita\n2024,MG,10\n'},
-        dpetl_linktable={'resource_list': ['arrecadacao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['arrecadacao']},
     )
 
     linktable.linktable_packages([despesa, receita], name='orcamento')
@@ -97,7 +97,7 @@ def test_linktable_packages_with_several_descriptors_is_across_packages(tmp_path
         make_package(
             tmp_path, name,
             {name: 'ano,vlr_valor\n2024,100\n'},
-            dpetl_linktable={'resource_list': [name]},
+            dpetl_linktable={'facts': ['vlr_*'], 'resource_list': [name]},
         )
         for name in ('despesa', 'receita')
     ]
@@ -117,7 +117,7 @@ def test_linktable_packages_requires_name_across_packages(tmp_path, caplog):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     with pytest.raises(SystemExit):
@@ -133,7 +133,7 @@ def test_linktable_packages_single_package(tmp_path):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,orgao,vlr_empenhado\n2024,A,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     linktable.linktable_packages([package], descriptor=single(package))
@@ -153,7 +153,7 @@ def test_linktable_packages_single_package_with_name(tmp_path):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     linktable.linktable_packages([package], name='outro', descriptor=single(package))
@@ -169,7 +169,7 @@ def test_linktable_packages_writes_valid_package(tmp_path):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,orgao,vlr_empenhado\n2024,A,100\n2024,B,200\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     linktable.linktable_packages([package], descriptor=single(package))
@@ -184,7 +184,7 @@ def test_linktable_packages_keeps_previous_metadata(tmp_path):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
     folder = tmp_path / 'datapackages' / 'despesa_linktable'
     folder.mkdir(parents=True)
@@ -208,7 +208,7 @@ def test_linktable_packages_warns_without_dpetl_load(tmp_path, caplog):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     linktable.linktable_packages([package], descriptor=single(package))
@@ -221,7 +221,7 @@ def test_linktable_packages_removes_stale_fact_tables(tmp_path):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
     data = tmp_path / 'datapackages' / 'despesa_linktable' / 'data'
     data.mkdir(parents=True)
@@ -242,7 +242,7 @@ def test_linktable_packages_only_uses_listed_resources(tmp_path):
             'execucao': 'ano,vlr_empenhado\n2024,100\n',
             'auxiliar': 'ano,vlr_outro\n2024,1\n',
         },
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     linktable.linktable_packages([package], name='orcamento')
@@ -262,7 +262,7 @@ def test_linktable_packages_describes_comma_delimiter(tmp_path):
     package = make_package(
         tmp_path, 'classificadores',
         {'acao': 'ano,cod,nome\n' + rows},
-        dpetl_linktable={'resource_list': ['acao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['acao']},
     )
 
     linktable.linktable_packages([package], name='orcamento')
@@ -283,7 +283,7 @@ def test_linktable_packages_fails_on_invalid_name(tmp_path, caplog, name):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
     )
 
     with pytest.raises(SystemExit):
@@ -297,7 +297,7 @@ def test_linktable_packages_refuses_source_package_folder(tmp_path, caplog):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
         folder='datapackages/despesa',
     )
     before = (tmp_path / 'datapackages' / 'despesa' / 'datapackage.json').read_text()
@@ -315,7 +315,7 @@ def test_linktable_packages_regenerates_among_other_packages(tmp_path):
     despesa = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
         folder='datapackages/despesa',
     )
     linktable.linktable_packages([despesa], name='orcamento')
@@ -334,7 +334,7 @@ def test_linktable_packages_keeps_same_resource_of_different_packages_apart(tmp_
         make_package(
             tmp_path, name,
             {'execucao': 'ano,vlr_valor\n2024,100\n'},
-            dpetl_linktable={'resource_list': ['execucao']},
+            dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
         )
         for name in ('despesa', 'receita')
     ]
@@ -355,7 +355,7 @@ def test_linktable_packages_stacks_same_package_in_different_years(tmp_path):
         make_package(
             tmp_path, 'dados_siafi',
             {'execucao': f'ano,orgao,vlr_empenhado\n{year},A,{value}\n'},
-            dpetl_linktable={'resource_list': ['execucao']},
+            dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
             folder=f'dados_siafi_{year}',
         )
         for year, value in ((2024, 100), (2025, 200))
@@ -380,7 +380,7 @@ def test_linktable_packages_fails_on_stacking_different_fields(tmp_path, caplog)
         make_package(
             tmp_path, 'dados_siafi',
             {'execucao': csv},
-            dpetl_linktable={'resource_list': ['execucao']},
+            dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao']},
             folder=f'dados_siafi_{year}',
         )
         for year, csv in (
@@ -404,7 +404,7 @@ def test_linktable_packages_fails_without_schema(tmp_path, caplog):
     (folder / 'datapackage.json').write_text(json.dumps({
         'name': 'despesa',
         'resources': [{'name': 'execucao', 'path': 'data/execucao.csv'}],
-        'dpetl_linktable': {'resource_list': ['execucao']},
+        'dpetl_linktable': {'facts': ['vlr_*'], 'resource_list': ['execucao']},
     }))
 
     with pytest.raises(SystemExit):
@@ -412,6 +412,148 @@ def test_linktable_packages_fails_without_schema(tmp_path, caplog):
 
     assert 'Resource execucao of package despesa has no schema fields.' in caplog.text
     assert not (tmp_path / 'datapackages').exists()
+
+
+# Facts configuration ----------------------------------------------------------
+def build_single(tmp_path, csv, dpetl_linktable):
+    """Build the linktable of a single 'despesa' package and return its files."""
+    package = make_package(tmp_path, 'despesa', {'execucao': csv}, dpetl_linktable=dpetl_linktable)
+    linktable.linktable_packages([package], descriptor=single(package))
+    _, files = read_output(tmp_path, 'despesa_linktable')
+    return files
+
+
+@pytest.mark.parametrize('dpetl_linktable, columns', [
+    ({'facts': ['qtd_*'], 'resource_list': ['execucao']}, ['key_execucao', 'qtd_itens']),
+    ({'facts': 'qtd_*', 'resource_list': ['execucao']}, ['key_execucao', 'qtd_itens']),
+    ({'facts': ['qtd_*'], 'resource_list': [{'name': 'execucao', 'facts': ['vlr_*', 'total']}]},
+     ['key_execucao', 'vlr_pago', 'total']),
+    ({'facts': ['vlr_*'], 'resource_list': [{'name': 'execucao', 'facts': []}]}, ['key_execucao']),
+])
+def test_linktable_packages_facts(tmp_path, dpetl_linktable, columns):
+    """Facts are set for the package and can be overridden per resource."""
+    files = build_single(
+        tmp_path, 'ano,vlr_pago,qtd_itens,total\n2024,100,3,7\n', dpetl_linktable,
+    )
+
+    assert list(files['fact_execucao.csv.gz'].columns) == columns
+
+
+def test_linktable_packages_non_facts_are_dimensions(tmp_path):
+    """Fields not matching the facts patterns become dimensions (key and linktable)."""
+    files = build_single(
+        tmp_path, 'ano,vlr_pago,qtd_itens\n2024,100,3\n',
+        {'facts': ['qtd_*'], 'resource_list': ['execucao']},
+    )
+
+    assert files['fact_execucao.csv.gz']['key_execucao'].tolist() == ['2024|100']
+    assert list(files['linktable.csv.gz'].columns) == ['key_execucao', 'ano', 'vlr_pago']
+
+
+@pytest.mark.parametrize('resource_list', [
+    ['execucao'],
+    [{'name': 'execucao', 'facts': ['vlr_*']}],
+])
+def test_linktable_packages_requires_package_facts(tmp_path, caplog, resource_list):
+    """Package facts are required, even when every resource sets its own."""
+    package = make_package(
+        tmp_path, 'despesa',
+        {'execucao': 'ano,vlr_pago\n2024,100\n'},
+        dpetl_linktable={'resource_list': resource_list},
+    )
+
+    with pytest.raises(SystemExit):
+        linktable.linktable_packages([package], descriptor=single(package))
+
+    assert 'Missing required field "facts" in "dpetl_linktable" for package despesa.' in caplog.text
+    assert not (tmp_path / 'datapackages').exists()
+
+
+def test_linktable_packages_fails_on_unknown_fact(tmp_path, caplog):
+    """A fact given by name (no wildcard) that is not a field stops the process."""
+    package = make_package(
+        tmp_path, 'despesa',
+        {'execucao': 'ano,vlr_pago\n2024,100\n'},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': [{'name': 'execucao', 'facts': ['vlr_*', 'totl']}]},
+    )
+
+    with pytest.raises(SystemExit):
+        linktable.linktable_packages([package], descriptor=single(package))
+
+    assert 'Facts not found in resource execucao of package despesa: totl.' in caplog.text
+    assert not (tmp_path / 'datapackages').exists()
+
+
+def test_linktable_packages_ignores_unmatched_fact_pattern(tmp_path):
+    """A pattern matching no field is not an error (e.g. a package-wide default)."""
+    files = build_single(
+        tmp_path, 'ano,vlr_pago\n2024,100\n',
+        {'facts': ['vlr_*', 'qtd_*'], 'resource_list': ['execucao']},
+    )
+
+    assert list(files['fact_execucao.csv.gz'].columns) == ['key_execucao', 'vlr_pago']
+
+
+@pytest.mark.parametrize('csv, missing', [
+    ('ano,orgao\n2024,A\n', 'facts'),
+    ('vlr_pago\n100\n', 'dimensions'),
+])
+def test_linktable_packages_warns_without_facts_or_dimensions(tmp_path, caplog, csv, missing):
+    """A resource without facts or without dimensions is built, with a warning."""
+    build_single(tmp_path, csv, {'facts': ['vlr_*'], 'resource_list': ['execucao']})
+
+    assert f'Resource execucao of package despesa has no {missing}.' in caplog.text
+
+
+@pytest.mark.parametrize('dpetl_linktable', [
+    {'facts': 10, 'resource_list': ['execucao']},
+    {'facts': ['vlr_*', 1], 'resource_list': ['execucao']},
+    {'facts': ['vlr_*'], 'resource_list': [{'name': 'execucao', 'facts': {'vlr': True}}]},
+    {'facts': ['vlr_*'], 'resource_list': [{'facts': ['vlr_*']}]},
+    {'facts': ['vlr_*'], 'resource_list': [['execucao']]},
+])
+def test_linktable_packages_fails_on_invalid_facts_config(tmp_path, dpetl_linktable):
+    """Invalid facts or resource_list items stop the process."""
+    package = make_package(
+        tmp_path, 'despesa',
+        {'execucao': 'ano,vlr_pago\n2024,100\n'},
+        dpetl_linktable=dpetl_linktable,
+    )
+
+    with pytest.raises(SystemExit):
+        linktable.linktable_packages([package], descriptor=single(package))
+
+    assert not (tmp_path / 'datapackages').exists()
+
+
+@pytest.mark.parametrize('facts_2025, stacked', [
+    (['total'], True),
+    (['vlr_*'], False),
+])
+def test_linktable_packages_stacks_with_facts_of_each_package(tmp_path, caplog, facts_2025, stacked):
+    """Stacked resources are split by their own package facts: the same fields
+    with different facts cannot be stacked."""
+    packages = [
+        make_package(
+            tmp_path, 'dados_siafi',
+            {'execucao': f'ano,total\n{year},100\n'},
+            dpetl_linktable={
+                'facts': facts,
+                'resource_list': ['execucao'],
+            },
+            folder=f'dados_siafi_{year}',
+        )
+        for year, facts in ((2024, ['total']), (2025, facts_2025))
+    ]
+
+    if stacked:
+        linktable.linktable_packages(packages, name='siafi')
+        _, files = read_output(tmp_path, 'siafi')
+        assert files['fact_dados_siafi_execucao.csv.gz']['total'].tolist() == ['100', '100']
+    else:
+        with pytest.raises(SystemExit):
+            linktable.linktable_packages(packages, name='siafi')
+        assert 'Stacked fact tables need the same dimensions and facts.' in caplog.text
 
 
 # Package selection ------------------------------------------------------------
@@ -430,7 +572,7 @@ def test_linktable_packages_skips_disabled_packages(tmp_path, dpetl_linktable):
 
 
 # Configuration errors ---------------------------------------------------------
-@pytest.mark.parametrize('dpetl_linktable', [True, {'resource_list': []}])
+@pytest.mark.parametrize('dpetl_linktable', [True, {'facts': ['vlr_*'], 'resource_list': []}])
 def test_linktable_packages_requires_resource_list(tmp_path, dpetl_linktable):
     """An enabled package without resource_list stops the process."""
     package = make_package(
@@ -450,7 +592,7 @@ def test_linktable_packages_fails_on_unknown_resource(tmp_path, caplog):
     package = make_package(
         tmp_path, 'despesa',
         {'execucao': 'ano,vlr_empenhado\n2024,100\n'},
-        dpetl_linktable={'resource_list': ['execucao', 'inexistente']},
+        dpetl_linktable={'facts': ['vlr_*'], 'resource_list': ['execucao', 'inexistente']},
     )
 
     with pytest.raises(SystemExit):
