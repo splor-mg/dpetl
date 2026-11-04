@@ -35,7 +35,7 @@ Use `dpetl --help` to inspect the CLI.
 dpetl extract     # download the data (modes: api, email, cli)
 dpetl transform   # rename fields, anonymize values and export the files
 dpetl load        # publish the data to a GitHub repository (or Postgres)
-dpetl linktable   # build a linktable across data packages
+dpetl linktable   # build fact tables and a linktable as a new data package
 ```
 
 ## How it works

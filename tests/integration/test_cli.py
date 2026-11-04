@@ -42,6 +42,19 @@ def test_command_calls_descriptor_iteration(mock_descriptor_iteration, command):
     assert kwargs.get('descriptor') is None
 
 
+@pytest.mark.parametrize('args, expected', [
+    ([], None),
+    (['--name', 'orcamento'], 'orcamento'),
+    (['-n', 'orcamento'], 'orcamento'),
+])
+def test_linktable_command_name(mock_descriptor_iteration, args, expected):
+    """linktable passes --name on to descriptor_iteration."""
+    result = runner.invoke(app, ['linktable'] + args, obj={'no_validate': True, 'no_stop': True})
+
+    assert result.exit_code == 0
+    assert mock_descriptor_iteration[0]['name'] == expected
+
+
 def test_transform_keygen_command():
     """The keygen subcommand generates a valid 64-char hex secret key."""
     result = runner.invoke(app, ['transform', 'keygen'])
