@@ -1,3 +1,19 @@
+## 0.19.0 (2026-11-10)
+
+### Feat
+
+- **transform**: add replace and compute field properties
+- **transform**: copy joined fields from a descriptor and keep known fields after cli
+- **load**: send files over 100 MB with Git LFS in git mode
+- skip extract, transform and load per resource with false
+- **transform**: add field join to attach columns from another file
+- **load**: add git mode for files too large for the GitHub API
+
+### Fix
+
+- **deps**: require petl >= 1.7.22
+- **iterator**: process datapackages in alphabetical order
+
 ## 0.18.4 (2026-10-13)
 
 ### Fix
