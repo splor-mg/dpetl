@@ -4,6 +4,8 @@
 
 ::: dpetl.extract.api
 
+::: dpetl.extract.email
+
 ::: dpetl.extract.command
 
-::: dpetl.extract.email
+::: dpetl.extract.sql

@@ -1,6 +1,6 @@
 # Extract
 
-Runs the ETL extraction phase. Downloads data from external sources (API, email) and saves them locally as configured in the datapackage.
+Runs the ETL extraction phase. Downloads data from external sources (API, email, database) and saves them locally as configured in the datapackage.
 
 ```bash
 # Run extract using the default datapackage.yaml descriptor
@@ -16,7 +16,7 @@ dpetl extract --add-package-name   # or -a
 dpetl extract --delay 5   # or -d 5
 ```
 
-Each resource in the descriptor must declare an extraction `mode` (`email`, `api` or `cli`) inside its `dpetl_extract` property (see [Example](#example)). If a resource is missing this property, the whole package extraction stops immediately.
+Each resource in the descriptor must declare an extraction `mode` (`email`, `api`, `cli` or `sql`) inside its `dpetl_extract` property (see [Example](#example)). If a resource is missing this property, the whole package extraction stops immediately.
 
 > **Tip:** Set `dpetl_extract: false` on a package or resource to skip it.
 
@@ -38,16 +38,6 @@ Once the URL is built, dpetl makes the request and saves the response to `resour
 
 If the resource declares `extrapaths` (multiple files for the same resource), the same steps run once per path, reusing the same base URL.
 
-## CLI Extractor
-
-Executes local command-line commands to generate or fetch data for the resource.
-
-Configure with `mode: cli` and a list of `arguments` under `dpetl_extract`:
-
-- `arguments`: required. A list of shell commands to run sequentially.
-
-Each command is executed in order. If a command fails, the error is logged and execution continues with the next command.
-
 ## Email Extractor
 
 Connects to your IMAP server using environment variables (`EMAIL_USER`, `EMAIL_PWD`, `EMAIL_IMAP`), applying proxy settings (`HTTP_PROXY`/`HTTPS_PROXY`) if set.
@@ -63,6 +53,34 @@ It then searches for the **most recent** e-mail matching `criteria`:
 Once a matching e-mail is found, its first attachment is saved to `resource.path`. If there is more than one attachment, the extra ones are saved next to it, named `{name}_1{ext}`, `{name}_2{ext}`, and so on.
 
 If the resource declares `extrapaths` (multiple files for the same resource), the same search-and-save logic runs once per path.
+
+## CLI Extractor
+
+Executes local command-line commands to generate or fetch data for the resource.
+
+Configure with `mode: cli` and a list of `arguments` under `dpetl_extract`:
+
+- `arguments`: required. A list of shell commands to run sequentially.
+
+Each command is executed in order. If a command fails, the error is logged and execution continues with the next command.
+
+## SQL Extractor
+
+Connects to your database using the environment variable `DATABASE_URL`, which holds a [SQLAlchemy URL](https://docs.sqlalchemy.org/en/20/core/engines.html#database-urls) (e.g. `postgresql://user:pwd@host/db`). Requires the `sql` extra (`pip install dpetl[sql]`) and the driver of your database.
+
+It then runs the query set in `dpetl_extract`, using the first one it finds:
+
+- `query`: optional. The SQL query to run.
+
+- `table`: optional. Runs `SELECT * FROM <table>`.
+
+- `query_file`: optional (defaults to `sql/<resource name>.sql`). File with the query, relative to the descriptor.
+
+Once the query runs, its result is saved to `resource.path`. Available formats: `csv` and `xlsx`.
+
+- `encoding`: optional (defaults to `utf-8`).
+
+- `delimiter`: optional (defaults to `,`).
 
 ## Example
 
