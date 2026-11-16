@@ -1,3 +1,9 @@
+## 0.20.0 (2026-11-16)
+
+### Feat
+
+- **extract**: add sql mode to extract data from databases
+
 ## 0.19.0 (2026-11-10)
 
 ### Feat
