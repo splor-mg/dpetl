@@ -19,9 +19,9 @@ pip install dpetl
 poetry add dpetl
 
 # Optional dependencies
-pip install dpetl[github-app]
+pip install "dpetl[github-app,sql]"
 
-poetry install --extras github-app
+poetry install --extras "github-app sql"
 ```
 
 
@@ -30,7 +30,7 @@ poetry install --extras github-app
 Use `dpetl --help` to inspect the CLI.
 
 ```bash
-dpetl extract    # download the data (modes: api, email, cli)
+dpetl extract    # download the data (modes: api, email, cli, sql)
 dpetl transform  # rename fields, anonymize values and export the files
 dpetl load       # publish the data to a GitHub repository
 ```

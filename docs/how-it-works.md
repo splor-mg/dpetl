@@ -37,7 +37,7 @@ dpetl_extract: false
 
 ## Environment file
 
-Environment variables for email extraction, GitHub authentication, and proxy settings can be defined in a `.env` file in the current working directory — it is loaded automatically.
+Environment variables for email and SQL extraction, GitHub authentication, and proxy settings can be defined in a `.env` file in the current working directory — it is loaded automatically.
 
 See the [Options](options.md#environment-variables) page for the complete list of supported variables and their usage.
 
