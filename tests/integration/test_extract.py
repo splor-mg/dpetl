@@ -1,13 +1,18 @@
 """
-Integration tests for extraction module: email and API sources.
+Integration tests for extraction module: email, API, CLI and SQL sources.
 """
+import csv
+import gzip
 import pytest
 import requests
+import sqlite3
 import subprocess
+import sys
 import logging
+import openpyxl
 from types import SimpleNamespace
 
-from dpetl.extract import api, command, email, extract
+from dpetl.extract import api, command, email, extract, sql
 
 
 # Helper: Mock for IMAP MailBox ------------------------------------------------
@@ -81,6 +86,7 @@ def test_extract_package_missing_mode(caplog):
     ('email', 'dpetl.extract.email.email_connection', 'test_resource'),
     ('api', 'dpetl.extract.api.check_multipart_files', ('api', 'test_resource')),
     ('cli', 'dpetl.extract.command.check_cli_commands', ('cli', 'test_resource')),
+    ('sql', 'dpetl.extract.sql.extract_sql', ('sql', 'test_resource')),
 ])
 def test_extract_package_modes(monkeypatch, mode, mock_path, expected):
     """extract_package dispatches to the correct extractor based on mode."""
@@ -97,6 +103,22 @@ def test_extract_package_modes(monkeypatch, mode, mock_path, expected):
     extract.extract_package(package, no_stop=True, no_validate=True)
 
     assert calls == [expected]
+
+
+def test_extract_package_skips_disabled_resource(monkeypatch):
+    """
+    A resource with dpetl_extract: false is skipped without stopping the others.
+    """
+    calls = []
+    monkeypatch.setattr('dpetl.extract.email.email_connection', lambda resource, **k: calls.append(resource.name))
+
+    skipped = make_fake_resource(None, name='skipped')
+    skipped.custom['dpetl_extract'] = False
+    package = make_fake_package([skipped, make_fake_resource('email', name='kept')])
+
+    extract.extract_package(package, no_stop=True, no_validate=True)
+
+    assert calls == ['kept']
 
 
 @pytest.mark.parametrize('check_resource_result, expected_sleep_calls', [
@@ -234,3 +256,116 @@ def test_run_cli_command_errors(monkeypatch, caplog, exception, expected_log):
     command.run_cli_command('cmd', type('Resource', (), {'name': 'test'})())
 
     assert expected_log in caplog.text
+
+
+# SQL extraction ---------------------------------------------------------------
+SQL_ROWS = [['id', 'nome'], ['1', 'ação'], ['2', 'b']]
+
+
+@pytest.fixture
+def sql_database(tmp_path, monkeypatch):
+    """SQLite database with a `dados` table, set in DATABASE_URL."""
+    database = tmp_path / 'database.sqlite'
+    connection = sqlite3.connect(database)
+    connection.execute('CREATE TABLE dados (id INTEGER, nome TEXT)')
+    connection.execute("INSERT INTO dados VALUES (1, 'ação'), (2, 'b')")
+    connection.commit()
+    connection.close()
+
+    monkeypatch.setenv('DATABASE_URL', f'sqlite:///{database}')
+
+
+def make_sql_resource(tmp_path, path='data/dados.csv', **config):
+    return SimpleNamespace(
+        name='dados',
+        path=path,
+        custom={'dpetl_extract': {'mode': 'sql', **config}},
+        package=SimpleNamespace(_basepath=str(tmp_path)),
+    )
+
+
+def test_extract_sql_missing_sqlalchemy(monkeypatch, tmp_path, caplog):
+    """extract_sql logs an error when sqlalchemy is not installed."""
+    monkeypatch.setitem(sys.modules, 'sqlalchemy', None)
+
+    sql.extract_sql(make_sql_resource(tmp_path, table='dados'))
+
+    assert 'SQL extraction requires the sql extra' in caplog.text
+
+
+def test_extract_sql_missing_url(monkeypatch, tmp_path, caplog):
+    """extract_sql logs an error when DATABASE_URL is missing."""
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    sql.extract_sql(make_sql_resource(tmp_path, table='dados'))
+
+    assert 'Missing environment variable "DATABASE_URL"' in caplog.text
+    assert not (tmp_path / 'data/dados.csv').exists()
+
+
+def test_extract_sql_missing_query(sql_database, tmp_path, caplog):
+    """extract_sql logs an error when there is no query to run."""
+    resource = make_sql_resource(tmp_path)
+
+    sql.extract_sql(resource)
+
+    assert 'Missing query for resource dados' in caplog.text
+    assert not (tmp_path / 'data/dados.csv').exists()
+
+
+@pytest.mark.parametrize('config, query_file', [
+    ({'query': 'SELECT * FROM dados'}, None),
+    ({'table': 'dados'}, None),
+    ({}, 'sql/dados.sql'),
+    ({'query_file': 'queries/custom.sql'}, 'queries/custom.sql'),
+])
+def test_extract_sql_query_sources(sql_database, tmp_path, config, query_file):
+    """The query comes from query, table, query_file or its default."""
+    if query_file:
+        file = tmp_path / query_file
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text('SELECT * FROM dados;\n', encoding='utf-8')
+
+    sql.extract_sql(make_sql_resource(tmp_path, **config))
+
+    with open(tmp_path / 'data/dados.csv', encoding='utf-8', newline='') as f:
+        assert list(csv.reader(f)) == SQL_ROWS
+
+
+def test_extract_sql_csv_options(sql_database, tmp_path, caplog):
+    """CSV files are saved with the configured encoding and delimiter."""
+    caplog.set_level(logging.INFO)
+    resource = make_sql_resource(
+        tmp_path,
+        table='dados',
+        encoding='latin-1',
+        delimiter=';',
+    )
+
+    sql.extract_sql(resource)
+
+    path = tmp_path / 'data/dados.csv'
+    with open(path, encoding='latin-1', newline='') as f:
+        assert list(csv.reader(f, delimiter=';')) == SQL_ROWS
+    assert 'Saved' in caplog.text
+
+
+def test_extract_sql_csv_gz(sql_database, tmp_path):
+    """A path ending with .gz is saved as a compressed CSV."""
+    path = 'data/dados.csv.gz'
+
+    sql.extract_sql(make_sql_resource(tmp_path, path=path, table='dados'))
+
+    with gzip.open(tmp_path / path, 'rt', encoding='utf-8', newline='') as f:
+        assert list(csv.reader(f)) == SQL_ROWS
+
+
+def test_extract_sql_xlsx(sql_database, tmp_path):
+    """A path ending with .xlsx is saved as an Excel file."""
+    path = 'data/dados.xlsx'
+
+    sql.extract_sql(make_sql_resource(tmp_path, path=path, table='dados'))
+
+    sheet = openpyxl.load_workbook(tmp_path / path).active
+    assert list(sheet.values) == [('id', 'nome'), (1, 'ação'), (2, 'b')]

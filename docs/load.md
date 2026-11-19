@@ -7,6 +7,8 @@ Runs the ETL load phase. Uploads transformed data and the updated `datapackage.j
 dpetl load
 ```
 
+> **Tip:** Set `dpetl_load: false` on a package or resource to skip it.
+
 ## Authentication
 
 dpetl supports two authentication methods:
@@ -34,6 +36,12 @@ Reads its settings from the package's `dpetl_load` property:
 - `target`: optional (defaults to `github`). Where the data is loaded: `github` or `postgres`.
 
 - `schema`: optional (defaults to the package name). Postgres schema that receives the tables when `target` is `postgres`.
+
+- `mode`: optional (defaults to `api`). How the files are sent when `repo` is set:
+
+    - `api`: uses the GitHub API, without cloning the repository.
+
+    - `git`: for files too large for the API. Uses a temporary clone and sends files over 100 MB with Git LFS (requires `git-lfs`). Files already sent with `lfs` are committed as pointers.
 
 - `lfs`: optional. Sends large data files to Git LFS (see [Large files with Git LFS](#large-files-with-git-lfs)).
 
@@ -118,7 +126,7 @@ On each load, dpetl:
 
 The `datapackage.json` keeps the relative resource paths. They are valid in a clone with `git-lfs` installed, but reading a resource straight from GitHub (e.g. a `raw.githubusercontent.com` URL) returns the pointer instead of the data.
 
-Without `lfs`, or when a large file doesn't match `patterns`, the load stops before committing if a file exceeds 100 MB.
+Without `lfs`, or when a large file doesn't match `patterns`, the load stops before committing if a file exceeds 100 MB, except in `mode: git`, which sends it with `git-lfs` from the temporary clone.
 
 If `lfs` is removed later, remove the dpetl block from `.gitattributes` (and the `.lfsconfig`) by hand.
 

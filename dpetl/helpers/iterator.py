@@ -25,7 +25,7 @@ def resolve_descriptors(operation=None, descriptor=None, **kwargs):
         return [Path(default)]
 
     if Path('datapackages').is_dir():
-        return list(Path('datapackages').glob(f'*/{default}'))
+        return sorted(Path('datapackages').glob(f'*/{default}'))
 
     logger.error('No descriptor found.')
     return None

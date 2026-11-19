@@ -30,3 +30,14 @@
         subject: "Payroll Report"   # optional (Defaults to resource name. See also the flag --add-package-name)
         from_: "finance@example.com"   # optional
         date_gte: 2024-01-01   # optional (See also the flag --today-email)
+
+  # SQL extraction
+  - name: sales
+    path: data/sales.csv   # .xlsx saves as Excel, .csv.gz as compressed CSV
+    dpetl_extract:
+      mode: sql
+      query: SELECT * FROM sales WHERE year = 2026   # optional
+      table: sales   # optional. Runs SELECT * FROM sales
+      query_file: sql/sales.sql   # optional (Defaults to sql/<resource name>.sql)
+      encoding: utf-8   # optional (Defaults to utf-8)
+      delimiter: ';'   # optional (Defaults to ,)

@@ -38,6 +38,16 @@ pip install "dpetl[postgres]"
 poetry add "dpetl[postgres]"
 ```
 
+To extract data from databases (see [SQL mode](extract.md)), install with:
+
+```bash
+# using pip
+pip install "dpetl[sql]"
+
+# using poetry
+poetry add "dpetl[sql]"
+```
+
 Extras can be combined, e.g. `dpetl[github-app,postgres]`.
 
 ## Usage

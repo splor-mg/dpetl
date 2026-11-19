@@ -26,6 +26,7 @@ All variables above can also be set in a `.env` file in the current directory in
 | `EMAIL_PWD` | extract (email mode) | Password for IMAP email connection |
 | `EMAIL_IMAP` | extract (email mode) | IMAP server address (e.g., imap.gmail.com) |
 | `HTTP_PROXY` | extract (email mode) | Proxy settings for IMAP connections* |
+| `DATABASE_URL` | extract (sql mode) | SQLAlchemy connection URL |
 | `ANONYMIZE_SECRET_KEY` | transform | Secret key for AES‑SIV anonymization |
 | `GH_TOKEN` | load | GitHub Personal Access Token |
 | `GH_APP_ID` | load | GitHub App ID |

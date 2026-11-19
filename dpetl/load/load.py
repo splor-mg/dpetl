@@ -101,9 +101,13 @@ def load_package(package, **kwargs):
     if settings['repo'] and not github.repo_exists(token, **settings):
         github.create_repo(token, **settings)
 
-    # Remove dpetl settings from the published descriptor
-    for resource in package.resources:
-        [resource.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform']]
+    # Skip disabled resources and remove dpetl settings from the
+    # published descriptor
+    for resource in list(package.resources):
+        if resource.custom.get('dpetl_load') is False:
+            package.remove_resource(resource.name)
+            continue
+        [resource.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform', 'dpetl_load']]
 
     [package.custom.pop(key, None) for key in ['dpetl_extract', 'dpetl_transform', 'dpetl_load', 'dpetl_linktable']]
 
@@ -121,14 +125,18 @@ def load_package(package, **kwargs):
         if lfs_settings:
             lfs_paths = lfs.store(files, token, lfs_settings, **settings)
 
-    lfs.check_size(files, lfs_paths)
+    # Git mode sends the remaining large files with git lfs itself
+    if not (settings['repo'] and settings['mode'] == 'git'):
+        lfs.check_size(files, lfs_paths)
 
     # Commit all files in a single commit
     logger.debug('Committing data package.')
 
     deletions = github.get_deletions(token, files, **settings)
 
-    if settings['repo']:
+    if settings['repo'] and settings['mode'] == 'git':
+        github.commit_clone(token, files, deletions, **settings)
+    elif settings['repo']:
         github.commit_remote(token, files, deletions, **settings)
     else:
         github.commit_local(files, deletions, lfs_paths)

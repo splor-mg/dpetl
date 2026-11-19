@@ -1,7 +1,7 @@
 import logging
 import time
 
-from dpetl.extract import api, command, email
+from dpetl.extract import api, command, email, sql
 from dpetl.helpers import validate
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,10 @@ def extract_package(package, **kwargs):
     delay = kwargs.get('delay', 0)
 
     for resource in package.resources:
+        if resource.custom.get('dpetl_extract') is False:
+            logger.info('Skipping extract for resource %s.', resource.name)
+            continue
+
         # Get extraction mode from resource custom metadata
         mode = resource.custom.get('dpetl_extract', {}).get('mode')
 
@@ -39,6 +43,8 @@ def extract_package(package, **kwargs):
             api.check_multipart_files(resource, **kwargs)
         elif mode == 'cli':
             command.check_cli_commands(resource, **kwargs)
+        elif mode == 'sql':
+            sql.extract_sql(resource, **kwargs)
 
         # Check if the extracted data is valid
         if not validate.check_resource(resource, rows, errors, **kwargs):
